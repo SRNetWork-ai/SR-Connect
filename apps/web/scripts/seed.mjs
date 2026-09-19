@@ -70,8 +70,15 @@ const MEMBER = mask(
 const MODERATOR = MEMBER | mask("MANAGE_MESSAGES", "MUTE_MEMBERS", "MOVE_MEMBERS", "CREATE_INVITE");
 const ADMIN = Object.values(BITS).reduce((a, b) => a | b, 0);
 
-const client = new pg.Client({ connectionString: DATABASE_URL });
-await client.connect();
+const client = new pg.Client({ connectionString: DATABASE_URL, connectionTimeoutMillis: 10_000 });
+try {
+  await client.connect();
+} catch (err) {
+  console.error(`اتصال به دیتابیس ممکن نشد: ${err.message}`);
+  console.error(`DATABASE_URL = ${DATABASE_URL.replace(/:[^:@/]+@/, ":***@")}`);
+  console.error("اگر پیام timeout است، کانتینر به postgres دسترسی شبکه‌ای ندارد.");
+  process.exit(1);
+}
 
 try {
   await client.query("begin");

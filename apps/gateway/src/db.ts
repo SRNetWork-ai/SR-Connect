@@ -8,6 +8,12 @@ export const pool = new pg.Pool({
   connectionTimeoutMillis: 8_000,
 });
 
+// بدون این هندلر، خطای یک کلاینتِ بی‌کار به‌صورت رویداد 'error' بدون شنونده
+// بالا می‌آید و کل پروسه را می‌کشد — دقیقاً وقتی دیتابیس لحظه‌ای قطع شود.
+pool.on("error", (err) => {
+  console.error("[gateway] خطای استخر پستگرس:", err.message);
+});
+
 export async function q<T extends pg.QueryResultRow = pg.QueryResultRow>(
   text: string,
   params: unknown[] = [],

@@ -17,8 +17,15 @@ if (!DATABASE_URL) {
   process.exit(1);
 }
 
-const client = new pg.Client({ connectionString: DATABASE_URL });
-await client.connect();
+const client = new pg.Client({ connectionString: DATABASE_URL, connectionTimeoutMillis: 10_000 });
+try {
+  await client.connect();
+} catch (err) {
+  console.error(`اتصال به دیتابیس ممکن نشد: ${err.message}`);
+  console.error(`DATABASE_URL = ${DATABASE_URL.replace(/:[^:@/]+@/, ":***@")}`);
+  console.error("اگر پیام timeout است، کانتینر به postgres دسترسی شبکه‌ای ندارد.");
+  process.exit(1);
+}
 
 try {
   await client.query(`create table if not exists schema_migrations (
