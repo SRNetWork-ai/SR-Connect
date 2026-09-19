@@ -34,7 +34,15 @@ ok()   { printf '  %s✔%s %s\n' "$C_OK" "$C_RESET" "$*"; }
 warn() { printf '  %s!%s %s\n' "$C_WARN" "$C_RESET" "$*"; }
 die()  { printf '\n%s✘ %s%s\n' "$C_ERR" "$*" "$C_RESET" >&2; exit 1; }
 
-trap 'die "نصب در خط $LINENO متوقف شد. برای جزئیات: docker compose -f '"$INSTALL_DIR"'/deploy/docker-compose.yml logs"' ERR
+on_error() {
+  local line="$1" cmd="$2"
+  printf '\n%s✘ نصب در خط %s متوقف شد.%s\n' "$C_ERR" "$line" "$C_RESET" >&2
+  printf '  دستوری که شکست خورد: %s%s%s\n' "$C_B" "$cmd" "$C_RESET" >&2
+  printf '  لاگ سرویس‌ها: docker compose -f %s/deploy/docker-compose.yml logs --tail=80\n' "$INSTALL_DIR" >&2
+  printf '  بعد از رفع مشکل، همین نصاب را دوباره اجرا کن — رمزها و کلیدها حفظ می‌شوند.\n' >&2
+  exit 1
+}
+trap 'on_error "$LINENO" "$BASH_COMMAND"' ERR
 
 banner() {
   cat <<'ART'
@@ -81,12 +89,20 @@ check_resources() {
   say "  ${C_DIM}رم ${mem_mb}MB · ${cores} هسته · ${disk_gb}GB فضای آزاد${C_RESET}"
   [ "$mem_mb" -ge 1800 ] || warn "رم کمتر از ۲ گیگ است؛ ساخت ایمیج ممکن است کند یا ناموفق باشد."
   [ "$disk_gb" -ge 8 ] || die "حداقل ۸ گیگابایت فضای آزاد لازم است (الان ${disk_gb}GB)."
-  if [ "$mem_mb" -lt 3500 ] && [ ! -f /swapfile ]; then
-    warn "رم کم است — ۲ گیگ swap می‌سازیم تا بیلد تمام شود."
-    fallocate -l 2G /swapfile 2>/dev/null || dd if=/dev/zero of=/swapfile bs=1M count=2048 status=none
-    chmod 600 /swapfile && mkswap -q /swapfile && swapon /swapfile
-    grep -q '^/swapfile' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
-    ok "swap فعال شد"
+  # روی LXC/OpenVZ ساخت swap مجاز نیست؛ نباید نصب را متوقف کند.
+  if [ "$mem_mb" -lt 3500 ] && [ ! -f /swapfile ] && ! swapon --show 2>/dev/null | grep -q .; then
+    warn "رم کم است — تلاش برای ساخت ۲ گیگ swap."
+    set +e; trap - ERR
+    ( fallocate -l 2G /swapfile 2>/dev/null || dd if=/dev/zero of=/swapfile bs=1M count=2048 status=none ) \
+      && chmod 600 /swapfile && mkswap -q /swapfile && swapon /swapfile
+    if [ $? -eq 0 ]; then
+      grep -q '^/swapfile' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
+      ok "swap فعال شد"
+    else
+      rm -f /swapfile
+      warn "ساخت swap ممکن نشد (احتمالاً سرور LXC/OpenVZ است). اگر بیلد به خاطر کمبود رم شکست خورد، پلن بالاتر لازم داری."
+    fi
+    set -e; trap 'on_error "$LINENO" "$BASH_COMMAND"' ERR
   fi
 }
 
@@ -248,26 +264,49 @@ EOF
 }
 
 # ── ۳) فایروال ─────────────────────────────────────────────────────────────
+PORTS_TCP="22 80 443 3478"
+PORTS_UDP="443 3478"
+PORTS_UDP_RANGE_UFW="50000:50400"
+PORTS_UDP_RANGE_FWD="50000-50400"
+
+# باز کردن پورت‌ها هیچ‌وقت نباید نصب را متوقف کند: روی بعضی VPS ها (LXC/OpenVZ،
+# کرنل بدون netfilter، یا ufw نیمه‌خراب) این دستورها خطا می‌دهند ولی خود سرویس
+# کاملاً سالم بالا می‌آید. پس کل این مرحله در حالت «بدون set -e» اجرا می‌شود.
 open_firewall() {
   step "باز کردن پورت‌ها"
-  local opened=0
-  if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q active; then
-    ufw allow 22/tcp >/dev/null
-    ufw allow 80/tcp >/dev/null
-    ufw allow 443/tcp >/dev/null
-    ufw allow 443/udp >/dev/null
-    ufw allow 3478/tcp >/dev/null
-    ufw allow 3478/udp >/dev/null
-    ufw allow 50000:50400/udp >/dev/null
-    opened=1; ok "ufw تنظیم شد"
+  local opened=0 failed=0 p
+  set +e
+  trap - ERR
+
+  if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -qi active; then
+    for p in $PORTS_TCP;  do ufw allow "$p/tcp" >/dev/null 2>&1 || failed=1; done
+    for p in $PORTS_UDP;  do ufw allow "$p/udp" >/dev/null 2>&1 || failed=1; done
+    ufw allow "$PORTS_UDP_RANGE_UFW/udp" >/dev/null 2>&1 || failed=1
+    opened=1
+    if [ "$failed" = 1 ]; then
+      warn "بعضی قانون‌های ufw ست نشد. خروجی خطا:"
+      ufw allow 80/tcp 2>&1 | sed 's/^/      /' | head -5
+    else
+      ok "ufw تنظیم شد"
+    fi
   elif command -v firewall-cmd >/dev/null 2>&1 && systemctl is-active --quiet firewalld; then
-    for p in 80/tcp 443/tcp 443/udp 3478/tcp 3478/udp 50000-50400/udp; do
-      firewall-cmd --permanent --add-port="$p" >/dev/null
+    for p in 80/tcp 443/tcp 443/udp 3478/tcp 3478/udp "$PORTS_UDP_RANGE_FWD/udp"; do
+      firewall-cmd --permanent --add-port="$p" >/dev/null 2>&1 || failed=1
     done
-    firewall-cmd --reload >/dev/null
-    opened=1; ok "firewalld تنظیم شد"
+    firewall-cmd --reload >/dev/null 2>&1 || failed=1
+    opened=1
+    [ "$failed" = 1 ] && warn "بعضی قانون‌های firewalld ست نشد." || ok "firewalld تنظیم شد"
   fi
-  [ "$opened" = 1 ] || warn "فایروال فعالی پیدا نشد. اگر فایروال ابری داری، این پورت‌ها را باز کن: TCP 80,443,3478 · UDP 443,3478,50000-50400"
+
+  if [ "$opened" != 1 ] || [ "$failed" = 1 ]; then
+    warn "این پورت‌ها را دستی (یا در پنل فایروال ابری) باز کن:"
+    say  "      TCP  80, 443, 3478"
+    say  "      UDP  443, 3478, 50000-50400"
+  fi
+
+  set -e
+  trap 'on_error "$LINENO" "$BASH_COMMAND"' ERR
+  return 0
 }
 
 # ── ۴) بالا آوردن سرویس‌ها ─────────────────────────────────────────────────
