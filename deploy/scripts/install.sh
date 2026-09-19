@@ -310,10 +310,58 @@ open_firewall() {
 }
 
 # ── ۴) بالا آوردن سرویس‌ها ─────────────────────────────────────────────────
+# سرویس‌ها یکی‌یکی بیلد می‌شوند نه موازی: روی سرور کوچک، بیلد موازی
+# next و gateway با هم رم را تمام می‌کند و کرنل پروسه را می‌کشد.
+build_one() { # build_one <service> <logfile>
+  local svc="$1" log="$2" rc=0
+  printf '  ساخت %-8s ' "$svc"
+  set +e; trap - ERR
+  docker compose build --pull "$svc" >>"$log" 2>&1
+  rc=$?
+  set -e; trap 'on_error "$LINENO" "$BASH_COMMAND"' ERR
+  if [ "$rc" -eq 0 ]; then printf '%s✔%s\n' "$C_OK" "$C_RESET"; else printf '%s✘%s\n' "$C_ERR" "$C_RESET"; fi
+  return "$rc"
+}
+
+explain_build_failure() { # explain_build_failure <logfile>
+  local log="$1"
+  printf '\n%s✘ ساخت ایمیج‌ها شکست خورد.%s\n' "$C_ERR" "$C_RESET" >&2
+  say "  ${C_DIM}──────── ۴۰ خط آخر لاگ ────────${C_RESET}"
+  tail -40 "$log" | sed 's/^/    /' >&2
+  say "  ${C_DIM}───────────────────────────────${C_RESET}"
+  say "  لاگ کامل: ${C_B}$log${C_RESET}"
+  say ""
+
+  if grep -qiE 'killed|out of memory|oom-kill|Cannot allocate memory|JavaScript heap out of memory|signal: killed|exit code: 137' "$log"; then
+    warn "علت محتمل: ${C_B}کمبود حافظه${C_RESET} هنگام بیلد."
+    say  "      swap بساز و دوباره نصاب را اجرا کن:"
+    say  "        sudo fallocate -l 4G /swapfile && sudo chmod 600 /swapfile"
+    say  "        sudo mkswap /swapfile && sudo swapon /swapfile"
+    say  "      اگر سرورت LXC/OpenVZ است و swap نمی‌پذیرد، پلن با رم بیشتر لازم داری (حداقل ۴ گیگ)."
+  elif grep -qiE 'no space left on device' "$log"; then
+    warn "علت محتمل: ${C_B}دیسک پر است${C_RESET}."
+    say  "      sudo docker system prune -af && df -h /"
+  elif grep -qiE 'TLS handshake|i/o timeout|dial tcp|could not resolve|Temporary failure in name resolution|certificate|connection reset' "$log"; then
+    warn "علت محتمل: ${C_B}مشکل شبکه یا تحریم${C_RESET} هنگام دانلود ایمیج/پکیج."
+    say  "      یک آینه (registry mirror) یا پروکسی برای داکر و npm ست کن و دوباره اجرا کن."
+  elif grep -qiE 'npm (ERR|error)|ERESOLVE|ENOTFOUND registry' "$log"; then
+    warn "علت محتمل: ${C_B}نصب پکیج‌های npm${C_RESET} شکست خورد (شبکه یا رجیستری)."
+  fi
+
+  say ""
+  say "  بعد از رفع مشکل، همین نصاب را دوباره اجرا کن — چیزی از دست نمی‌رود."
+  exit 1
+}
+
 build_and_start() {
-  step "ساخت ایمیج‌ها (اولین بار ۳ تا ۸ دقیقه طول می‌کشد)"
+  step "ساخت ایمیج‌ها (اولین بار ۳ تا ۸ دقیقه طول می‌کشد؛ در این مدت خروجی کم است)"
   cd "$INSTALL_DIR/deploy"
-  docker compose build --pull 2>&1 | sed 's/^/    /' | tail -5
+  local log="$INSTALL_DIR/deploy/build.log"
+  : > "$log"
+  say "  ${C_DIM}لاگ زنده: tail -f $log${C_RESET}"
+
+  build_one web     "$log" || explain_build_failure "$log"
+  build_one gateway "$log" || explain_build_failure "$log"
   ok "ایمیج‌ها ساخته شدند"
 
   step "بالا آوردن سرویس‌ها"

@@ -173,13 +173,44 @@ docker compose exec postgres pg_isready -U srconnect
 </details>
 
 <details>
+<summary><b>بیلد ایمیج‌ها شکست می‌خورد</b></summary>
+
+نصاب لاگ کامل بیلد را اینجا می‌نویسد و در صورت خطا ۴۰ خط آخرش را نشان می‌دهد:
+
+```bash
+tail -60 /opt/sr-connect/deploy/build.log
+```
+
+برای دیدن خطای خام، بیلد را دستی اجرا کن:
+
+```bash
+cd /opt/sr-connect/deploy && docker compose build --pull web
+```
+
+شایع‌ترین علت روی سرورهای کوچک، **کشته شدن پروسه به خاطر کمبود رم** است
+(`exit code: 137` یا `Killed` در لاگ). سراغ بخش بعدی برو.
+</details>
+
+<details>
 <summary><b>حافظه کم می‌آورد هنگام بیلد</b></summary>
 
 نصب‌کننده خودش swap می‌سازد، ولی اگر دستی نصب می‌کنی:
 ```bash
-sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile
+sudo fallocate -l 4G /swapfile && sudo chmod 600 /swapfile
 sudo mkswap /swapfile && sudo swapon /swapfile
 echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+free -h      # باید Swap را ببینی
+
+اگر `swapon` خطای `Operation not permitted` داد، سرورت **LXC/OpenVZ** است و
+اصلاً swap نمی‌پذیرد؛ در این حالت یا پلن با رم بیشتر بگیر (حداقل ۴ گیگ)، یا
+ایمیج را جای دیگری بیلد کن و push کن.
+
+سقف حافظه‌ی بیلد را هم می‌شود دستی پایین‌تر آورد:
+
+```bash
+cd /opt/sr-connect/deploy
+docker compose build --build-arg NODE_HEAP_MB=1024 web
+```
 ```
 </details>
 
