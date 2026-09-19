@@ -21,7 +21,7 @@ rollback() {
 trap rollback ERR
 
 step "بکاپ قبل از به‌روزرسانی"
-"$INSTALL_DIR/deploy/scripts/backup.sh" --quiet
+bash "$INSTALL_DIR/deploy/scripts/backup.sh" --quiet
 ok "بکاپ گرفته شد"
 
 step "دریافت نسخه‌ی جدید"

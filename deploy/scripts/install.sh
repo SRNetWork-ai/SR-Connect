@@ -183,6 +183,8 @@ fetch_code() {
     git clone --depth 1 --branch "$BRANCH" "$REPO_URL" "$INSTALL_DIR" -q
     ok "مخزن در $INSTALL_DIR کلون شد"
   fi
+  # گیت بیت اجرا را همیشه نگه نمی‌دارد؛ دستی ست می‌کنیم.
+  chmod +x "$INSTALL_DIR"/deploy/scripts/*.sh 2>/dev/null || true
 }
 
 write_env() {
@@ -344,10 +346,10 @@ EOF
   ${C_DIM}دستورهای روزمره:${C_RESET}
     وضعیت:     cd $INSTALL_DIR/deploy && docker compose ps
     لاگ زنده:  cd $INSTALL_DIR/deploy && docker compose logs -f web gateway
-    آپدیت:     sudo $INSTALL_DIR/deploy/scripts/update.sh
-    بکاپ:      sudo $INSTALL_DIR/deploy/scripts/backup.sh
-    سلامت:     sudo $INSTALL_DIR/deploy/scripts/health.sh
-    حذف:       sudo $INSTALL_DIR/deploy/scripts/uninstall.sh
+    آپدیت:     sudo bash $INSTALL_DIR/deploy/scripts/update.sh
+    بکاپ:      sudo bash $INSTALL_DIR/deploy/scripts/backup.sh
+    سلامت:     sudo bash $INSTALL_DIR/deploy/scripts/health.sh
+    حذف:       sudo bash $INSTALL_DIR/deploy/scripts/uninstall.sh
 
   ${C_WARN}مهم:${C_RESET} از $INSTALL_DIR/deploy/keys و deploy/.env بکاپ بگیر.
   کلید امضای آپدیت اگر گم شود، کلاینت‌های قدیمی نسخه‌های بعدی را قبول نمی‌کنند.

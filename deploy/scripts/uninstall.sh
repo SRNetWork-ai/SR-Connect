@@ -11,7 +11,7 @@ read -r -p "ادامه؟ (yes/no) " a </dev/tty
 [ "$a" = "yes" ] || { echo "لغو شد."; exit 0; }
 
 if [ -d "$INSTALL_DIR/deploy" ]; then
-  "$INSTALL_DIR/deploy/scripts/backup.sh" || echo "بکاپ نهایی نگرفت (بی‌خیال)."
+  bash "$INSTALL_DIR/deploy/scripts/backup.sh" || echo "بکاپ نهایی نگرفت (بی‌خیال)."
   cd "$INSTALL_DIR/deploy"
   if [ "$PURGE" = 1 ]; then docker compose down -v --remove-orphans; else docker compose down --remove-orphans; fi
 fi
