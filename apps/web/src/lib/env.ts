@@ -24,6 +24,8 @@ export const serverEnv = {
     signingKey: process.env.UPDATE_SIGNING_KEY ?? "",
     releasesDir: process.env.RELEASES_DIR ?? "",
     channel: process.env.UPDATE_CHANNEL ?? "stable",
+    /** کلید عمومی امضا — در زمان اجرا سرو می‌شود تا ایمیج آماده نیاز به بیلد مجدد نداشته باشد. */
+    publicKey: process.env.UPDATE_PUBKEY ?? process.env.NEXT_PUBLIC_UPDATE_PUBKEY ?? "",
   },
   voiceCapacity: Number(process.env.VOICE_CAPACITY ?? 20),
 };

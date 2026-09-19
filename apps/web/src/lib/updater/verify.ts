@@ -1,4 +1,4 @@
-import { UPDATE_PUBKEY } from "@/lib/config";
+import { getUpdatePubkey } from "@/lib/runtime-config";
 
 export type SignatureResult =
   | { ok: true; algorithm: "Ed25519" }
@@ -31,11 +31,13 @@ export async function verifySignature(
   signatureB64: string,
 ): Promise<SignatureResult> {
   const message = new TextEncoder().encode(sha256Hex);
+  // کلید از سرور خوانده می‌شود تا ایمیج آماده هم بتواند امضا را درست بررسی کند.
+  const pubkey = await getUpdatePubkey();
 
   try {
     const key = await crypto.subtle.importKey(
       "raw",
-      b64ToBytes(UPDATE_PUBKEY) as unknown as ArrayBuffer,
+      b64ToBytes(pubkey) as unknown as ArrayBuffer,
       { name: "Ed25519" },
       false,
       ["verify"],

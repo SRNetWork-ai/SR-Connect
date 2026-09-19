@@ -24,6 +24,11 @@ BRANCH="${BRANCH:-main}"
 INSTALL_DIR="${INSTALL_DIR:-/opt/sr-connect}"
 NONINTERACTIVE="${NONINTERACTIVE:-0}"
 SR_VERSION="${SR_VERSION:-1.0.0}"
+# pull = ایمیج آماده از GHCR (پیش‌فرض، بدون نیاز به رم زیاد)
+# build = بیلد روی همین سرور   |   auto = اول pull، اگر نشد build
+SR_MODE="${SR_MODE:-auto}"
+GHCR_WEB="${GHCR_WEB:-ghcr.io/srnetwork-ai/sr-connect-web:latest}"
+GHCR_GATEWAY="${GHCR_GATEWAY:-ghcr.io/srnetwork-ai/sr-connect-gateway:latest}"
 
 C_RESET=$'\033[0m'; C_DIM=$'\033[2m'; C_B=$'\033[1m'
 C_OK=$'\033[32m'; C_WARN=$'\033[33m'; C_ERR=$'\033[31m'; C_BRAND=$'\033[38;5;105m'
@@ -86,11 +91,20 @@ check_resources() {
   cores=$(nproc)
   disk_gb=$(df -BG --output=avail / | tail -1 | tr -dc '0-9')
 
+  MEM_MB="$mem_mb"
   say "  ${C_DIM}رم ${mem_mb}MB · ${cores} هسته · ${disk_gb}GB فضای آزاد${C_RESET}"
-  [ "$mem_mb" -ge 1800 ] || warn "رم کمتر از ۲ گیگ است؛ ساخت ایمیج ممکن است کند یا ناموفق باشد."
   [ "$disk_gb" -ge 8 ] || die "حداقل ۸ گیگابایت فضای آزاد لازم است (الان ${disk_gb}GB)."
-  # روی LXC/OpenVZ ساخت swap مجاز نیست؛ نباید نصب را متوقف کند.
-  if [ "$mem_mb" -lt 3500 ] && [ ! -f /swapfile ] && ! swapon --show 2>/dev/null | grep -q .; then
+  if [ "$mem_mb" -lt 1700 ]; then
+    warn "رم زیر ۲ گیگ است. اجرا شدنی است ولی جای مانور ندارد."
+  fi
+
+  # تنظیم پستگرس متناسب با رم واقعی
+  if   [ "$mem_mb" -lt 2500 ]; then PG_SHARED_BUFFERS=96MB;  PG_MAX_CONNECTIONS=40; PG_WORK_MEM=3MB
+  elif [ "$mem_mb" -lt 5000 ]; then PG_SHARED_BUFFERS=256MB; PG_MAX_CONNECTIONS=80; PG_WORK_MEM=8MB
+  else                              PG_SHARED_BUFFERS=512MB; PG_MAX_CONNECTIONS=150; PG_WORK_MEM=16MB
+  fi
+  # swap فقط برای بیلد محلی لازم است؛ در حالت ایمیج آماده اختیاری است.
+  if [ "$SR_MODE" != "pull" ] && [ "$mem_mb" -lt 3500 ] && [ ! -f /swapfile ] && ! swapon --show 2>/dev/null | grep -q .; then
     warn "رم کم است — تلاش برای ساخت ۲ گیگ swap."
     set +e; trap - ERR
     ( fallocate -l 2G /swapfile 2>/dev/null || dd if=/dev/zero of=/swapfile bs=1M count=2048 status=none ) \
@@ -233,6 +247,9 @@ write_env() {
   UPDATE_PUBKEY="$(cat "$key_dir/update-signing.pub")"
   UPDATE_SIGNING_KEY="$(base64 -w0 < "$key_dir/update-signing.key")"
 
+  SR_IMAGE_WEB="${SR_IMAGE_WEB:-$GHCR_WEB}"
+  SR_IMAGE_GATEWAY="${SR_IMAGE_GATEWAY:-$GHCR_GATEWAY}"
+
   umask 077
   cat > "$env_file" <<EOF
 # ساخته‌شده توسط install.sh در $(date -Is)
@@ -252,6 +269,13 @@ UPDATE_PUBKEY=$UPDATE_PUBKEY
 UPDATE_SIGNING_KEY=$UPDATE_SIGNING_KEY
 NEXT_PUBLIC_UPDATE_PUBKEY=$UPDATE_PUBKEY
 UPDATE_CHANNEL=stable
+
+SR_IMAGE_WEB=$SR_IMAGE_WEB
+SR_IMAGE_GATEWAY=$SR_IMAGE_GATEWAY
+
+PG_SHARED_BUFFERS=$PG_SHARED_BUFFERS
+PG_MAX_CONNECTIONS=$PG_MAX_CONNECTIONS
+PG_WORK_MEM=$PG_WORK_MEM
 
 SESSION_TTL_DAYS=30
 ALLOW_REGISTRATION=1
@@ -349,20 +373,67 @@ explain_build_failure() { # explain_build_failure <logfile>
   fi
 
   say ""
+  say "  ${C_B}ساده‌ترین راه:${C_RESET} به‌جای بیلد، ایمیج آماده را بگیر —"
+  say "        sudo SR_MODE=pull bash $INSTALL_DIR/deploy/scripts/install.sh"
   say "  بعد از رفع مشکل، همین نصاب را دوباره اجرا کن — چیزی از دست نمی‌رود."
   exit 1
 }
 
+# تلاش برای گرفتن ایمیج آماده. موفق شد ⇒ روی سرور هیچ بیلدی لازم نیست.
+try_pull() { # try_pull <logfile>
+  local log="$1" rc=0
+  printf '  دریافت ایمیج‌های آماده '
+  set +e; trap - ERR
+  docker compose pull --quiet web gateway >>"$log" 2>&1
+  rc=$?
+  set -e; trap 'on_error "$LINENO" "$BASH_COMMAND"' ERR
+  if [ "$rc" -eq 0 ]; then printf '%s✔%s\n' "$C_OK" "$C_RESET"; else printf '%s—%s\n' "$C_DIM" "$C_RESET"; fi
+  return "$rc"
+}
+
+switch_to_local_build() {
+  SR_IMAGE_WEB="sr-connect/web:local"
+  SR_IMAGE_GATEWAY="sr-connect/gateway:local"
+  sed -i "s|^SR_IMAGE_WEB=.*|SR_IMAGE_WEB=$SR_IMAGE_WEB|;s|^SR_IMAGE_GATEWAY=.*|SR_IMAGE_GATEWAY=$SR_IMAGE_GATEWAY|" \
+    "$INSTALL_DIR/deploy/.env"
+  export SR_IMAGE_WEB SR_IMAGE_GATEWAY
+}
+
 build_and_start() {
-  step "ساخت ایمیج‌ها (اولین بار ۳ تا ۸ دقیقه طول می‌کشد؛ در این مدت خروجی کم است)"
   cd "$INSTALL_DIR/deploy"
   local log="$INSTALL_DIR/deploy/build.log"
   : > "$log"
-  say "  ${C_DIM}لاگ زنده: tail -f $log${C_RESET}"
+  local mode="$SR_MODE"
 
-  build_one web     "$log" || explain_build_failure "$log"
-  build_one gateway "$log" || explain_build_failure "$log"
-  ok "ایمیج‌ها ساخته شدند"
+  if [ "$mode" = auto ] || [ "$mode" = pull ]; then
+    step "آماده‌سازی ایمیج‌ها"
+    if try_pull "$log"; then
+      ok "ایمیج‌های آماده دریافت شد — روی این سرور بیلدی انجام نمی‌شود"
+      mode=done
+    elif [ "$mode" = pull ]; then
+      say ""
+      tail -20 "$log" | sed 's/^/    /' >&2
+      die "دریافت ایمیج آماده نشد. با SR_MODE=build دوباره اجرا کن تا روی خود سرور بیلد شود."
+    else
+      warn "ایمیج آماده در دسترس نبود؛ روی خود سرور بیلد می‌کنیم."
+      if [ "${MEM_MB:-0}" -lt 3500 ] && ! swapon --show 2>/dev/null | grep -q .; then
+        warn "با ${MEM_MB}MB رم و بدون swap، بیلد احتمالاً کشته می‌شود."
+        say  "      پیشنهاد: اول swap بساز، بعد دوباره اجرا کن:"
+        say  "        sudo fallocate -l 4G /swapfile && sudo chmod 600 /swapfile"
+        say  "        sudo mkswap /swapfile && sudo swapon /swapfile"
+      fi
+      mode=build
+    fi
+  fi
+
+  if [ "$mode" = build ]; then
+    switch_to_local_build
+    step "ساخت ایمیج‌ها روی سرور (۵ تا ۱۵ دقیقه؛ خروجی کم است)"
+    say "  ${C_DIM}لاگ زنده: tail -f $log${C_RESET}"
+    build_one web     "$log" || explain_build_failure "$log"
+    build_one gateway "$log" || explain_build_failure "$log"
+    ok "ایمیج‌ها ساخته شدند"
+  fi
 
   step "بالا آوردن سرویس‌ها"
   docker compose up -d --remove-orphans >/dev/null

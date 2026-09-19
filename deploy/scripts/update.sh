@@ -15,7 +15,7 @@ PREV="$(git rev-parse HEAD)"
 rollback() {
   printf '\n%s✘ به‌روزرسانی شکست خورد؛ برگشت به %s%s\n' "$C_ERR" "${PREV:0:8}" "$C_R" >&2
   git reset --hard "$PREV" -q
-  (cd deploy && docker compose up -d --build) || true
+  (cd deploy && { docker compose pull -q web gateway || docker compose build; }; docker compose up -d) || true
   exit 1
 }
 trap rollback ERR
@@ -33,7 +33,13 @@ ok "کد روی ${NEW:0:8} آمد"
 
 step "ساخت و راه‌اندازی"
 cd deploy
-docker compose build --pull 2>&1 | tail -3
+# اول ایمیج آماده؛ اگر نشد روی همین سرور بیلد کن.
+if grep -q '^SR_IMAGE_WEB=ghcr.io' .env 2>/dev/null && docker compose pull -q web gateway 2>/dev/null; then
+  echo "  ایمیج‌های آماده دریافت شد."
+else
+  echo "  بیلد محلی…"
+  docker compose build --pull 2>&1 | tail -3
+fi
 docker compose up -d --remove-orphans >/dev/null
 ok "سرویس‌ها بالا آمدند"
 
