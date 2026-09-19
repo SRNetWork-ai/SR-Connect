@@ -54,3 +54,9 @@ backup: ## بکاپ کامل
 
 update: ## به‌روزرسانی سرور از گیت
 	sudo bash deploy/scripts/update.sh
+
+doctor: ## عیب‌یابی نصب
+	sudo bash deploy/scripts/doctor.sh
+
+doctor-fix: ## عیب‌یابی + اصلاح خودکار
+	sudo bash deploy/scripts/doctor.sh --fix

@@ -467,7 +467,11 @@ dump_state() { # dump_state <پیام>
   done
   say ""
   say "  لاگ کامل: ${C_B}cd $INSTALL_DIR/deploy && docker compose logs --tail=200${C_RESET}"
-  say "  بعد از رفع مشکل، همین نصاب را دوباره اجرا کن."
+  say ""
+  say "  ${C_B}عیب‌یاب خودکار:${C_RESET}"
+  say "    sudo bash $INSTALL_DIR/deploy/scripts/doctor.sh          # تشخیص"
+  say "    sudo bash $INSTALL_DIR/deploy/scripts/doctor.sh --fix    # تشخیص + اصلاح"
+  say ""
   exit 1
 }
 
@@ -507,7 +511,12 @@ migrate_and_seed() {
     [ "$rc" -eq 0 ] && break
     [ "$attempt" -lt 5 ] && { printf '  تلاش %s ناموفق، دوباره…\n' "$attempt"; sleep 5; }
   done
-  [ -n "$out" ] && printf '%s\n' "$out" | sed 's/^/    /'
+  if [ -n "$out" ]; then
+    say "  ${C_DIM}── خروجی مهاجرت ──${C_RESET}"
+    printf '%s\n' "$out" | sed 's/^/    /'
+  else
+    say "  ${C_DIM}(مهاجرت هیچ خروجی‌ای نداد)${C_RESET}"
+  fi
   if [ "$rc" -ne 0 ]; then dump_state "مهاجرت دیتابیس شکست خورد (کد $rc)."; fi
 
   run_logged "ساخت داده‌ی اولیه" \

@@ -140,6 +140,8 @@ TLS با **Caddy** و Let's Encrypt به‌صورت خودکار گرفته و �
 بعد از نصب، این دستورها در `/opt/sr-connect/deploy/scripts/` در دسترس‌اند:
 
 ```bash
+sudo bash /opt/sr-connect/deploy/scripts/doctor.sh      # عیب‌یابی کامل
+sudo bash /opt/sr-connect/deploy/scripts/doctor.sh --fix # عیب‌یابی + اصلاح خودکار
 sudo bash /opt/sr-connect/deploy/scripts/health.sh      # وضعیت سرویس‌ها
 sudo bash /opt/sr-connect/deploy/scripts/update.sh      # آپدیت + rollback خودکار
 sudo bash /opt/sr-connect/deploy/scripts/backup.sh      # بکاپ کامل
