@@ -1,0 +1,27 @@
+{
+  "name": "sr-connect",
+  "version": "1.0.0",
+  "private": true,
+  "description": "چت و صوت خودمیزبان — تجربه‌ی دیسکورد، هسته‌ی صوتی تیم‌اسپیک",
+  "license": "MIT",
+  "workspaces": ["apps/*", "packages/*"],
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "dev": "npm run dev --workspace @sr/web",
+    "dev:gateway": "npm run dev --workspace @sr/gateway",
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "migrate": "npm run migrate --workspace @sr/web",
+    "seed": "npm run seed --workspace @sr/web",
+    "keygen": "node apps/web/scripts/keygen.mjs",
+    "sign-release": "node apps/web/scripts/sign-release.mjs",
+    "fonts": "node scripts/fonts.mjs",
+    "postinstall": "node scripts/fonts.mjs",
+    "format": "prettier --write \"**/*.{ts,tsx,css,md,json,yml,yaml}\""
+  },
+  "devDependencies": {
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.3",
+    "vazirmatn": "^33.0.3"
+  }
+}

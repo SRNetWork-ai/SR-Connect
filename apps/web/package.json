@@ -1,0 +1,35 @@
+{
+  "name": "@sr/web",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "migrate": "node scripts/migrate.mjs",
+    "seed": "node scripts/seed.mjs",
+    "keygen": "node scripts/keygen.mjs",
+    "sign-release": "node scripts/sign-release.mjs"
+  },
+  "dependencies": {
+    "@sr/protocol": "*",
+    "framer-motion": "^11.15.0",
+    "livekit-client": "^2.7.2",
+    "lucide-react": "^0.469.0",
+    "next": "15.5.25",
+    "pg": "^8.13.1",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "zustand": "^5.0.2"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.0.0",
+    "@types/node": "^22.10.2",
+    "@types/pg": "^8.11.10",
+    "@types/react": "^19.0.2",
+    "@types/react-dom": "^19.0.2",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.7.3"
+  }
+}

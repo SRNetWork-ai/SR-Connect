@@ -1,0 +1,181 @@
+@import "tailwindcss";
+
+/* ==========================================================================
+   SR-Connect — Design System (فاز ۱)
+   پالت پایه از تم تاریک دیسکورد گرفته شده، تایپوگرافی فارسی با وزیرمتن.
+   ========================================================================== */
+
+@theme {
+  /* --- سطوح (surfaces) --- */
+  --color-rail: #1e1f22;
+  --color-sidebar: #2b2d31;
+  --color-chat: #313338;
+  --color-card: #383a40;
+  --color-hover: #35373c;
+  --color-deep: #232428;
+  --color-floating: #111214;
+  --color-divider: #3f4147;
+  --color-stroke: #45474d;
+
+  /* --- رنگ‌های معنایی --- */
+  --color-brand: #5865f2;
+  --color-brand-hover: #4752c4;
+  --color-brand-soft: #5865f224;
+  --color-success: #23a55a;
+  --color-success-soft: #23a55a26;
+  --color-warning: #f0b232;
+  --color-warning-soft: #f0b23226;
+  --color-danger: #f23f43;
+  --color-danger-soft: #f23f4326;
+  --color-offline: #80848e;
+  --color-link: #00a8fc;
+
+  /* --- متن --- */
+  --color-t1: #f2f3f5;
+  --color-t2: #dbdee1;
+  --color-t3: #b5bac1;
+  --color-t4: #949ba4;
+  --color-t5: #80848e;
+
+  /* --- تایپوگرافی --- */
+  --font-sans: var(--font-vazirmatn), "Noto Sans Arabic", "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+
+  --text-2xs: 0.625rem;
+  --text-2xs--line-height: 1.4;
+  --text-xs: 0.6875rem;
+  --text-xs--line-height: 1.5;
+  --text-sm: 0.8125rem;
+  --text-sm--line-height: 1.55;
+  --text-base: 0.9375rem;
+  --text-base--line-height: 1.6;
+
+  /* --- شعاع و سایه --- */
+  --radius-pill: 999px;
+  --shadow-float: 0 8px 24px rgb(0 0 0 / 0.32);
+  --shadow-line: 0 1px 0 rgb(0 0 0 / 0.24);
+
+  /* --- انیمیشن --- */
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  --animate-pulse-ring: pulse-ring 1.6s var(--ease-out-soft) infinite;
+  --animate-shimmer: shimmer 1.8s linear infinite;
+  --animate-float-slow: float-slow 9s ease-in-out infinite;
+}
+
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 var(--color-success-soft); }
+  70% { box-shadow: 0 0 0 10px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+@keyframes shimmer {
+  0% { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
+}
+@keyframes float-slow {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(0, -18px, 0) scale(1.04); }
+}
+
+/* ==========================================================================
+   Base
+   ========================================================================== */
+
+@layer base {
+  * {
+    min-width: 0;
+  }
+
+  html {
+    color-scheme: dark;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html,
+  body {
+    min-height: 100%;
+  }
+
+  body {
+    /* تیره‌ترین سطح؛ صفحه‌های تک‌کارتی (اسپلش/ورود) زیرشان نوار روشن نشان ندهند */
+    background-color: var(--color-floating);
+    color: var(--color-t2);
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* اعداد در متن فارسی همیشه لاتین بمانند تا با ورژن‌ها و زمان‌ها قاطی نشود */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+
+  ::selection {
+    background: var(--color-brand);
+    color: #fff;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #1a1b1e;
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #16171a;
+  }
+
+  input,
+  button,
+  textarea,
+  select {
+    font: inherit;
+    color: inherit;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* ==========================================================================
+   Utilities سبک که نوشتنشان با Tailwind تکراری می‌شد
+   ========================================================================== */
+
+@utility scroll-y {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+@utility glass {
+  background: color-mix(in oklab, var(--color-floating) 72%, transparent);
+  backdrop-filter: blur(18px) saturate(140%);
+  border: 1px solid rgb(255 255 255 / 0.06);
+}
+
+/* هاله‌ی رنگی پشت اسپلش و لاگین */
+@utility aurora {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}

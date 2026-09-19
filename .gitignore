@@ -1,0 +1,17 @@
+node_modules/
+.next/
+dist/
+out/
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+deploy/.env
+deploy/releases/*
+!deploy/releases/.gitkeep
+deploy/coturn/secret.conf
+backups/
+dev-keys/
+*.log
+.DS_Store
+apps/web/public/fonts/
