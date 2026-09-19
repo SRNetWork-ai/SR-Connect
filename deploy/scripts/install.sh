@@ -439,24 +439,83 @@ build_and_start() {
   docker compose up -d --remove-orphans >/dev/null
   ok "کانتینرها اجرا شدند"
 
+  local pg_ok=0
   printf '  در انتظار آماده شدن پستگرس'
   for _ in $(seq 1 60); do
     if docker compose exec -T postgres pg_isready -U sr -d srconnect >/dev/null 2>&1; then
-      printf '\n'; ok "پستگرس آماده است"; break
+      pg_ok=1; printf '\n'; ok "پستگرس آماده است"; break
     fi
     printf '.'; sleep 2
   done
+  if [ "$pg_ok" != 1 ]; then
+    printf '\n'
+    dump_state "پستگرس بعد از ۱۲۰ ثانیه آماده نشد."
+  fi
+}
+
+# وضعیت کامل سرویس‌ها را چاپ کن و خارج شو — هیچ خطایی نباید پنهان بماند.
+dump_state() { # dump_state <پیام>
+  set +e; trap - ERR
+  cd "$INSTALL_DIR/deploy" 2>/dev/null
+  printf '\n%s✘ %s%s\n\n' "$C_ERR" "$1" "$C_RESET" >&2
+  say "  ${C_DIM}──────── وضعیت سرویس‌ها ────────${C_RESET}"
+  docker compose ps 2>&1 | sed 's/^/    /' >&2
+  for svc in web gateway postgres caddy; do
+    say ""
+    say "  ${C_DIM}──────── لاگ $svc (۲۵ خط آخر) ────────${C_RESET}"
+    docker compose logs --tail=25 --no-color "$svc" 2>&1 | sed 's/^/    /' >&2
+  done
+  say ""
+  say "  لاگ کامل: ${C_B}cd $INSTALL_DIR/deploy && docker compose logs --tail=200${C_RESET}"
+  say "  بعد از رفع مشکل، همین نصاب را دوباره اجرا کن."
+  exit 1
+}
+
+# اجرای یک دستور با نمایش خروجی، بدون قورت دادن کد خطا.
+run_logged() { # run_logged <عنوان> <دستور...>
+  local title="$1"; shift
+  local out rc=0
+  set +e; trap - ERR
+  out="$("$@" 2>&1)"; rc=$?
+  set -e; trap 'on_error "$LINENO" "$BASH_COMMAND"' ERR
+  [ -n "$out" ] && printf '%s\n' "$out" | sed 's/^/    /'
+  if [ "$rc" -ne 0 ]; then dump_state "$title شکست خورد (کد $rc)."; fi
+  return 0
 }
 
 migrate_and_seed() {
   step "مهاجرت دیتابیس و داده‌ی اولیه"
   cd "$INSTALL_DIR/deploy"
-  docker compose exec -T web node apps/web/scripts/migrate.mjs 2>&1 | sed 's/^/    /'
-  ADMIN_USERNAME="$ADMIN_USERNAME" ADMIN_PASSWORD="$ADMIN_PASSWORD" \
+
+  # کانتینر web باید واقعاً در حال اجرا باشد وگرنه exec بی‌معنی است.
+  local cid=""
+  for _ in $(seq 1 30); do
+    cid="$(docker compose ps -q web 2>/dev/null | head -1)"
+    if [ -n "$cid" ] && [ "$(docker inspect -f '{{.State.Running}}' "$cid" 2>/dev/null)" = "true" ]; then
+      break
+    fi
+    sleep 2; cid=""
+  done
+  [ -n "$cid" ] || dump_state "کانتینر web بالا نیامد، پس مهاجرت اجرا نشد."
+
+  # اولین اتصال به دیتابیس گاهی چند ثانیه دیرتر جواب می‌دهد؛ چند بار تلاش می‌کنیم.
+  local out rc=1 attempt
+  for attempt in 1 2 3 4 5; do
+    set +e; trap - ERR
+    out="$(docker compose exec -T web node apps/web/scripts/migrate.mjs 2>&1)"; rc=$?
+    set -e; trap 'on_error "$LINENO" "$BASH_COMMAND"' ERR
+    [ "$rc" -eq 0 ] && break
+    [ "$attempt" -lt 5 ] && { printf '  تلاش %s ناموفق، دوباره…\n' "$attempt"; sleep 5; }
+  done
+  [ -n "$out" ] && printf '%s\n' "$out" | sed 's/^/    /'
+  if [ "$rc" -ne 0 ]; then dump_state "مهاجرت دیتابیس شکست خورد (کد $rc)."; fi
+
+  run_logged "ساخت داده‌ی اولیه" \
     docker compose exec -T \
       -e ADMIN_USERNAME="$ADMIN_USERNAME" \
       -e ADMIN_PASSWORD="$ADMIN_PASSWORD" \
-      web node apps/web/scripts/seed.mjs 2>&1 | sed 's/^/    /'
+      web node apps/web/scripts/seed.mjs
+
   ok "نقش‌ها، کانال‌ها و کاربر مدیر آماده‌اند"
 }
 
