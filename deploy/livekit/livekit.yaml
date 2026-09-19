@@ -1,0 +1,34 @@
+# LiveKit — تنظیم‌شده برای حدود ۲۰ کاربر هم‌زمان روی VPS کوچک
+port: 7880
+bind_addresses:
+  - 0.0.0.0
+
+rtc:
+  # این بازه‌ی UDP باید در فایروال باز باشد (install.sh این کار را می‌کند).
+  port_range_start: 50000
+  port_range_end: 50200
+  tcp_port: 7881
+  use_external_ip: true
+
+room:
+  auto_create: true
+  empty_timeout: 300
+  max_participants: 30
+  enabled_codecs:
+    - mime: audio/opus
+    - mime: video/vp8
+    - mime: video/h264
+
+audio:
+  # تشخیص گوینده‌ی فعال — حلقه‌ی سبز دور آواتار از همین می‌آید.
+  active_level: 35
+  min_percentile: 40
+  update_interval: 400
+  smooth_intervals: 4
+
+turn:
+  enabled: false # coturn جدا بالا می‌آید
+
+logging:
+  level: info
+  json: false

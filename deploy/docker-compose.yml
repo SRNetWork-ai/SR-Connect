@@ -1,0 +1,120 @@
+# SR-Connect — پشته‌ی کامل روی یک VPS کوچک (۲ هسته / ۴ گیگ)
+# راه‌اندازی از طریق deploy/scripts/install.sh انجام می‌شود.
+name: sr-connect
+
+services:
+  caddy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    environment:
+      SR_DOMAIN: "${SR_DOMAIN}"
+      SR_ACME_EMAIL: "${SR_ACME_EMAIL}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - web
+      - gateway
+    networks: [sr]
+
+  web:
+    image: "sr-connect/web:${SR_VERSION:-1.0.0}"
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_APP_VERSION: "${SR_VERSION:-1.0.0}"
+        NEXT_PUBLIC_UPDATE_PUBKEY: "${UPDATE_PUBKEY}"
+        NEXT_PUBLIC_GATEWAY_URL: "wss://${SR_DOMAIN}/ws"
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      DATABASE_URL: "postgres://sr:${POSTGRES_PASSWORD}@postgres:5432/srconnect"
+      LIVEKIT_URL: "ws://host.docker.internal:7880"
+      LIVEKIT_PUBLIC_URL: "wss://${SR_DOMAIN}/rtc"
+      RELEASES_DIR: /srv/releases
+    volumes:
+      - ./releases:/srv/releases
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [sr]
+
+  gateway:
+    image: "sr-connect/gateway:${SR_VERSION:-1.0.0}"
+    build:
+      context: ..
+      dockerfile: apps/gateway/Dockerfile
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      DATABASE_URL: "postgres://sr:${POSTGRES_PASSWORD}@postgres:5432/srconnect"
+      GATEWAY_PORT: "4001"
+      APP_VERSION: "${SR_VERSION:-1.0.0}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [sr]
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sr
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+      POSTGRES_DB: srconnect
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+    # تنظیم سبک برای ۴ گیگ رم
+    command:
+      - postgres
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - max_connections=80
+      - -c
+      - work_mem=8MB
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sr -d srconnect"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [sr]
+
+  livekit:
+    image: livekit/livekit-server:v1.8
+    restart: unless-stopped
+    command: --config /etc/livekit.yaml
+    # WebRTC به بازه‌ی بزرگی از پورت‌های UDP نیاز دارد؛ host کم‌تأخیرترین حالت است.
+    network_mode: host
+    volumes:
+      - ./livekit/livekit.yaml:/etc/livekit.yaml:ro
+    environment:
+      LIVEKIT_KEYS: "${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}"
+
+  coturn:
+    image: coturn/coturn:4.6-alpine
+    restart: unless-stopped
+    network_mode: host
+    command: ["-c", "/etc/coturn/turnserver.conf"]
+    volumes:
+      - ./coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:
+
+networks:
+  sr:
+    driver: bridge

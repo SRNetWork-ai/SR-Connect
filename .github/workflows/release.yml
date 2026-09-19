@@ -1,0 +1,110 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "نسخه (مثلاً 1.1.0)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build, sign & publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Resolve version
+        id: ver
+        run: |
+          V="${{ github.event.inputs.version }}"
+          [ -n "$V" ] || V="${GITHUB_REF_NAME#v}"
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "نسخه: $V"
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+
+      - name: Package
+        id: pack
+        run: |
+          V="${{ steps.ver.outputs.version }}"
+          mkdir -p dist stage
+          rsync -a --exclude '.git' \
+                   --exclude 'node_modules' \
+                   --exclude '.next/cache' \
+                   --exclude 'dist' \
+                   --exclude 'stage' \
+                   --exclude 'deploy/keys' \
+                   --exclude 'deploy/releases' \
+                   --exclude '.env' \
+                   ./ stage/
+          ( cd stage && zip -qr "../dist/sr-connect-${V}.zip" . )
+          echo "artifact=dist/sr-connect-${V}.zip" >> "$GITHUB_OUTPUT"
+          ls -lh "dist/sr-connect-${V}.zip"
+
+      - name: Sign package
+        env:
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+          RELEASES_DIR: dist/releases
+        run: |
+          if [ -z "${UPDATE_SIGNING_KEY:-}" ]; then
+            echo "::warning::secret به نام UPDATE_SIGNING_KEY تنظیم نشده — امضا رد شد."
+            exit 0
+          fi
+          node apps/web/scripts/sign-release.mjs \
+            --version "${{ steps.ver.outputs.version }}" \
+            --file    "${{ steps.pack.outputs.artifact }}" \
+            --channel stable \
+            --notes   "انتشار خودکار از ${GITHUB_REF_NAME}" \
+            | tee dist/sign-output.txt
+          # خروجی حالت CI با یک بلاک JSON تمام می‌شود ⇒ همان manifest است.
+          sed -n '/^{/,$p' dist/sign-output.txt > dist/manifest.json
+          rm -f dist/sign-output.txt
+          cat dist/manifest.json
+
+      - name: Checksums
+        run: |
+          cd dist && rm -rf releases && sha256sum ./* > SHA256SUMS.txt && cat SHA256SUMS.txt
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.ver.outputs.version }}
+          name: SR-Connect v${{ steps.ver.outputs.version }}
+          generate_release_notes: true
+          files: |
+            dist/sr-connect-*.zip
+            dist/manifest.json
+            dist/SHA256SUMS.txt
+          body: |
+            ## نصب یک‌خطی
+
+            ```bash
+            curl -fsSL https://raw.githubusercontent.com/${{ github.repository }}/main/deploy/scripts/install.sh | sudo bash
+            ```
+
+            ## آپدیت از نسخهٔ قبل
+
+            ```bash
+            sudo bash /opt/sr-connect/deploy/scripts/update.sh
+            ```
