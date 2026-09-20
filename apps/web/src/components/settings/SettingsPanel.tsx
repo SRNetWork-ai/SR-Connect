@@ -1,9 +1,22 @@
 "use client";
 
-import { Hash, Link2, Plus, Shield, Users, Volume2 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
-import type { Category, Channel } from "@sr/protocol";
+import { motion } from "framer-motion";
+import {
+  Camera,
+  Hash,
+  Link2,
+  Plus,
+  ScrollText,
+  Shield,
+  Trash2,
+  UserRound,
+  Users,
+  Volume2,
+} from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { AuditEntry, Category, Channel } from "@sr/protocol";
 import { PERMISSION_BITS, PERMISSION_LABELS, has } from "@sr/protocol";
+import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Field } from "@/components/ui/Input";
@@ -29,19 +42,20 @@ interface Invite {
   expiresAt: string | null;
 }
 
-type Tab = "channels" | "roles" | "invites";
+type Tab = "profile" | "channels" | "roles" | "invites" | "audit";
 
 export function SettingsPanel() {
   const me = useApp((s) => s.me);
   const channels = useApp((s) => s.channels);
   const categories = useApp((s) => s.categories);
   const refreshChannels = useApp((s) => s.refreshChannels);
-  const [tab, setTab] = useState<Tab>("channels");
+  const [tab, setTab] = useState<Tab>("profile");
   const [error, setError] = useState<string | null>(null);
 
   const canManageChannels = me ? me.isAdmin || has(me.permissions, "MANAGE_CHANNELS") : false;
   const canManageRoles = me ? me.isAdmin || has(me.permissions, "MANAGE_ROLES") : false;
   const canInvite = me ? me.isAdmin || has(me.permissions, "CREATE_INVITE") : false;
+  const canAudit = canManageRoles;
 
   const onError = useCallback((e: string | null) => setError(e), []);
 
@@ -51,27 +65,38 @@ export function SettingsPanel() {
         <header className="flex items-center gap-3">
           <Shield className="size-6 text-brand" />
           <div>
-            <h1 className="text-xl font-bold text-t1">تنظیمات سرور</h1>
-            <p className="text-sm text-t4">کانال‌ها، نقش‌ها و دعوت‌نامه‌ها</p>
+            <h1 className="text-xl font-bold text-t1">تنظیمات</h1>
+            <p className="text-sm text-t4">
+              پروفایل، کانال‌ها، نقش‌ها، دعوت‌نامه‌ها و گزارش فعالیت
+            </p>
           </div>
         </header>
 
         <nav className="flex gap-1.5">
           {(
             [
+              ["profile", "پروفایل من", UserRound],
               ["channels", "کانال‌ها", Hash],
               ["roles", "نقش‌ها و دسترسی", Users],
               ["invites", "دعوت‌نامه‌ها", Link2],
+              ["audit", "گزارش فعالیت", ScrollText],
             ] as const
           ).map(([id, label, Icon]) => (
             <button
               key={id}
               onClick={() => setTab(id)}
               className={cn(
-                "flex items-center gap-1.5 rounded-[4px] px-3 py-1.5 text-sm transition-colors",
-                tab === id ? "bg-brand text-white" : "bg-card text-t3 hover:bg-hover",
+                "relative flex items-center gap-1.5 rounded-[6px] px-3 py-1.5 text-sm transition-colors",
+                tab === id ? "text-white" : "bg-card text-t3 hover:bg-hover",
               )}
             >
+              {tab === id && (
+                <motion.span
+                  layoutId="settings-tab"
+                  transition={{ type: "spring", stiffness: 420, damping: 34 }}
+                  className="absolute inset-0 -z-10 rounded-[6px] bg-brand"
+                />
+              )}
               <Icon className="size-3.5" />
               {label}
             </button>
@@ -82,6 +107,7 @@ export function SettingsPanel() {
           <p className="rounded-md bg-danger-soft px-3 py-2 text-sm text-[#ff8a8d]">{error}</p>
         )}
 
+        {tab === "profile" && <ProfileTab />}
         {tab === "channels" && (
           <ChannelsTab
             canManage={canManageChannels}
@@ -93,6 +119,7 @@ export function SettingsPanel() {
         )}
         {tab === "roles" && <RolesTab canManage={canManageRoles} onError={onError} />}
         {tab === "invites" && <InvitesTab canManage={canInvite} onError={onError} />}
+        {tab === "audit" && <AuditTab canManage={canAudit} onError={onError} />}
       </div>
     </div>
   );
@@ -397,6 +424,215 @@ function InvitesTab({
         ))}
         {invites.length === 0 && (
           <li className="py-3 text-center text-sm text-t4">دعوت‌نامه‌ای نیست.</li>
+        )}
+      </ul>
+    </section>
+  );
+}
+
+const PALETTE = [
+  "#5865F2",
+  "#EB459E",
+  "#57F287",
+  "#FEE75C",
+  "#ED4245",
+  "#3BA55D",
+  "#FAA81A",
+  "#9B59B6",
+  "#1ABC9C",
+  "#E67E22",
+];
+
+function ProfileTab() {
+  const me = useApp((s) => s.me);
+  const updateProfile = useApp((s) => s.updateProfile);
+  const [displayName, setDisplayName] = useState(me?.displayName ?? "");
+  const [bio, setBio] = useState(me?.bio ?? "");
+  const [color, setColor] = useState(me?.avatarColor ?? PALETTE[0]!);
+  const [avatar, setAvatar] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!avatar) {
+      setPreview(null);
+      return;
+    }
+    const url = URL.createObjectURL(avatar);
+    setPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [avatar]);
+
+  const dirty =
+    displayName !== (me?.displayName ?? "") ||
+    bio !== (me?.bio ?? "") ||
+    color !== (me?.avatarColor ?? "") ||
+    Boolean(avatar);
+
+  async function save() {
+    setBusy(true);
+    await updateProfile({ displayName, bio, avatarColor: color, avatar });
+    setAvatar(null);
+    setBusy(false);
+  }
+
+  return (
+    <section className="rounded-lg bg-card p-5">
+      <div className="flex flex-wrap items-start gap-6">
+        <div className="text-center">
+          <button
+            onClick={() => fileRef.current?.click()}
+            className="group relative grid size-20 place-items-center rounded-full"
+          >
+            {preview ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={preview} alt="پیش‌نمایش" className="size-20 rounded-full object-cover" />
+            ) : (
+              <Avatar name={displayName || "کاربر"} color={color} url={me?.avatarUrl} size="xl" />
+            )}
+            <span className="absolute inset-0 grid place-items-center rounded-full bg-black/55 opacity-0 transition-opacity group-hover:opacity-100">
+              <Camera className="size-5 text-white" />
+            </span>
+          </button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            hidden
+            onChange={(e) => setAvatar(e.target.files?.[0] ?? null)}
+          />
+          <p className="mt-2 text-2xs text-t4">حداکثر ۴ مگابایت</p>
+          {me?.avatarUrl && (
+            <button
+              onClick={() => void updateProfile({ avatar: null })}
+              className="mt-1 flex items-center gap-1 text-2xs text-danger hover:underline"
+            >
+              <Trash2 className="size-3" />
+              حذف آواتار
+            </button>
+          )}
+        </div>
+
+        <div className="min-w-[240px] flex-1 space-y-3">
+          <Field
+            label="نام نمایشی"
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+            placeholder="نامی که دیگران می‌بینند"
+          />
+          <label className="block text-sm">
+            <span className="mb-1.5 block text-xs font-bold text-t3">درباره‌ی من</span>
+            <textarea
+              rows={3}
+              maxLength={280}
+              value={bio}
+              onChange={(e) => setBio(e.target.value)}
+              placeholder="یک خط درباره‌ی خودت"
+              className="w-full resize-none rounded-[4px] bg-deep px-3 py-2 text-base text-t2 outline-none focus:ring-1 focus:ring-brand"
+            />
+            <span className="tnum mt-1 block text-end text-2xs text-t5">
+              {fa(280 - bio.length)}
+            </span>
+          </label>
+
+          <div>
+            <span className="mb-1.5 block text-xs font-bold text-t3">رنگ آواتار</span>
+            <div className="flex flex-wrap gap-2">
+              {PALETTE.map((c) => (
+                <motion.button
+                  key={c}
+                  whileHover={{ scale: 1.14 }}
+                  whileTap={{ scale: 0.92 }}
+                  onClick={() => setColor(c)}
+                  style={{ background: c }}
+                  className={cn(
+                    "size-7 rounded-full transition-shadow",
+                    color === c && "ring-2 ring-white ring-offset-2 ring-offset-card",
+                  )}
+                />
+              ))}
+            </div>
+          </div>
+
+          <Button loading={busy} disabled={!dirty} onClick={() => void save()}>
+            ذخیره‌ی تغییرات
+          </Button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+const ACTION_LABELS: Record<string, string> = {
+  "channel.create": "ساخت کانال",
+  "channel.update": "ویرایش کانال",
+  "channel.delete": "حذف کانال",
+  "message.delete": "حذف پیام",
+  "message.edit": "ویرایش پیام",
+  "role.create": "ساخت نقش",
+  "role.update": "ویرایش نقش",
+  "invite.create": "ساخت دعوت‌نامه",
+  "user.login": "ورود کاربر",
+  "user.register": "ثبت‌نام کاربر",
+  "release.publish": "انتشار نسخه",
+};
+
+const stamp = new Intl.DateTimeFormat("fa-IR", { dateStyle: "short", timeStyle: "short" });
+
+function AuditTab({
+  canManage,
+  onError,
+}: {
+  canManage: boolean;
+  onError: (e: string | null) => void;
+}) {
+  const [entries, setEntries] = useState<AuditEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!canManage) {
+      setLoading(false);
+      return;
+    }
+    void api
+      .get<{ entries: AuditEntry[] }>("/api/admin/audit")
+      .then((d) => setEntries(d.entries))
+      .catch((err) => onError((err as Error).message))
+      .finally(() => setLoading(false));
+  }, [canManage, onError]);
+
+  if (!canManage) {
+    return <p className="rounded-lg bg-card p-5 text-sm text-t4">دسترسی دیدن گزارش را نداری.</p>;
+  }
+
+  return (
+    <section className="rounded-lg bg-card p-5">
+      <p className="text-sm text-t3">آخرین کارهای مدیریتی روی سرور.</p>
+      <ul className="mt-4 space-y-1">
+        {loading && <li className="py-3 text-center text-sm text-t4">در حال بارگذاری…</li>}
+        {entries.map((e, i) => (
+          <motion.li
+            key={e.id}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: Math.min(i * 0.015, 0.3) }}
+            className="flex items-center gap-3 rounded-[5px] bg-deep px-3 py-2 text-sm"
+          >
+            <Badge tone="outline">{ACTION_LABELS[e.action] ?? e.action}</Badge>
+            <span className="text-t2">{e.actorName}</span>
+            {e.target && (
+              <code dir="ltr" className="truncate text-2xs text-t5">
+                {e.target}
+              </code>
+            )}
+            <span className="tnum ms-auto shrink-0 text-2xs text-t4">
+              {stamp.format(new Date(e.createdAt))}
+            </span>
+          </motion.li>
+        ))}
+        {!loading && entries.length === 0 && (
+          <li className="py-3 text-center text-sm text-t4">هنوز رویدادی ثبت نشده.</li>
         )}
       </ul>
     </section>

@@ -47,13 +47,13 @@ Postgres کاملاً کافی است و یک سرویس کمتر یعنی RAM �
 
 ## احراز هویت
 
-| لایه | مکانیزم |
-|---|---|
-| رمز عبور | `scrypt` با salt تصادفی ۱۶ بایتی (`lib/auth/password.ts`) |
-| نشست | توکن تصادفی ۳۲ بایتی، ذخیره به‌صورت hash در جدول `sessions` |
-| کوکی | `httpOnly` + `Secure` + `SameSite=Lax`، عمر ۳۰ روز |
-| WebSocket | **تیکت یک‌بارمصرف ۶۰ ثانیه‌ای** |
-| صدا | JWT اختصاصی LiveKit با TTL کوتاه، صادرشده سمت سرور |
+| لایه      | مکانیزم                                                     |
+| --------- | ----------------------------------------------------------- |
+| رمز عبور  | `scrypt` با salt تصادفی ۱۶ بایتی (`lib/auth/password.ts`)   |
+| نشست      | توکن تصادفی ۳۲ بایتی، ذخیره به‌صورت hash در جدول `sessions` |
+| کوکی      | `httpOnly` + `Secure` + `SameSite=Lax`، عمر ۳۰ روز          |
+| WebSocket | **تیکت یک‌بارمصرف ۶۰ ثانیه‌ای**                             |
+| صدا       | JWT اختصاصی LiveKit با TTL کوتاه، صادرشده سمت سرور          |
 
 ### چرا تیکت برای WebSocket؟
 
@@ -78,10 +78,25 @@ WS  wss://host/ws?ticket=…
 `packages/protocol/src/permissions.ts` — یک bitmask با ۱۹ بیت:
 
 ```ts
-VIEW_CHANNEL, SEND_MESSAGES, MANAGE_MESSAGES, EMBED_LINKS, ATTACH_FILES,
-ADD_REACTIONS, MENTION_EVERYONE, CONNECT, SPEAK, STREAM, MUTE_MEMBERS,
-DEAFEN_MEMBERS, MOVE_MEMBERS, PRIORITY_SPEAKER, MANAGE_CHANNELS,
-MANAGE_ROLES, KICK_MEMBERS, BAN_MEMBERS, ADMINISTRATOR
+(VIEW_CHANNEL,
+  SEND_MESSAGES,
+  MANAGE_MESSAGES,
+  EMBED_LINKS,
+  ATTACH_FILES,
+  ADD_REACTIONS,
+  MENTION_EVERYONE,
+  CONNECT,
+  SPEAK,
+  STREAM,
+  MUTE_MEMBERS,
+  DEAFEN_MEMBERS,
+  MOVE_MEMBERS,
+  PRIORITY_SPEAKER,
+  MANAGE_CHANNELS,
+  MANAGE_ROLES,
+  KICK_MEMBERS,
+  BAN_MEMBERS,
+  ADMINISTRATOR);
 ```
 
 محاسبهٔ دسترسی مؤثر:
@@ -100,11 +115,17 @@ override ها در جدول `channel_overrides` به ازای هر جفت (کا�
 
 `apps/web/src/lib/db/migrations/`
 
-| migration | جدول‌ها |
-|---|---|
-| `001_init.sql` | `users`, `sessions`, `roles`, `user_roles`, `categories`, `channels`, `channel_overrides`, `messages`, `attachments`, `invites`, `audit_log`, `settings` |
-| `002_releases.sql` | `releases`, `client_versions` |
-| `003_tickets.sql` | `realtime_tickets` |
+| migration            | جدول‌ها                                                                                                                                                  |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `001_init.sql`       | `users`, `sessions`, `roles`, `user_roles`, `categories`, `channels`, `channel_overrides`, `messages`, `attachments`, `invites`, `audit_log`, `settings` |
+| `002_releases.sql`   | `releases`, `client_versions`                                                                                                                            |
+| `003_tickets.sql`    | `realtime_tickets`                                                                                                                                       |
+| `004_reactions.sql`  | `message_reactions`                                                                                                                                      |
+| `005_read_state.sql` | `read_state`, `mentions`                                                                                                                                 |
+| `006_uploads.sql`    | ستون‌های `users.avatar_url`/`bio`، `attachments.width`/`height`/`created_at` و nullable شدن `attachments.message_id`                                     |
+
+`attachments.message_id` عمداً nullable است: فایل قبل از ارسال پیام آپلود
+می‌شود و «یتیم» می‌ماند تا هنگام `POST /messages` به پیام وصل شود.
 
 migration ها **idempotent** اند (`create table if not exists`) و ترتیب اجرا
 بر اساس نام فایل است. اجرا با `npm run migrate`.
@@ -118,7 +139,10 @@ migration ها **idempotent** اند (`create table if not exists`) و ترتی�
 - کانتینر LiveKit روی `network_mode: host` اجرا می‌شود تا رنج پورت UDP
   بدون NAT داکر کار کند (این برای کارایی حیاتی است).
 - توکن اتصال در `POST /api/voice/token` ساخته می‌شود؛ سرور قبلش
-  بیت‌های `CONNECT` و `SPEAK` را روی همان کانال چک می‌کند.
+  بیت‌های `CONNECT_VOICE` و `SPEAK` را روی همان کانال چک می‌کند و `canShare`
+  را از بیت `SCREEN_SHARE` برمی‌گرداند.
+- اشتراک صفحه از همان اتاق LiveKit با `setScreenShareEnabled` منتشر می‌شود؛
+  ترک ویدئو در state ذخیره می‌شود و React آن را بالای لیست پیام‌ها می‌چیند.
 - **coturn** به‌عنوان TURN/STUN برای کاربران پشت NAT سخت‌گیر یا فایروال شرکتی.
   روی `443/tcp` هم گوش می‌دهد تا از فایروال‌هایی که فقط HTTPS می‌دهند رد شود.
 
@@ -139,14 +163,14 @@ auto gain control.
 
 کدهای بستن اتصال:
 
-| کد | معنی |
-|---|---|
+| کد     | معنی                  |
+| ------ | --------------------- |
 | `4401` | تیکت نامعتبر یا منقضی |
-| `4403` | دسترسی ندارد |
-| `4408` | heartbeat نرسید |
-| `4409` | نشست تکراری |
-| `4429` | rate limit |
-| `4500` | خطای سرور |
+| `4403` | دسترسی ندارد          |
+| `4408` | heartbeat نرسید       |
+| `4409` | نشست تکراری           |
+| `4429` | rate limit            |
+| `4500` | خطای سرور             |
 
 heartbeat هر ۲۵ ثانیه، timeout در ۶۰ ثانیه. کلاینت با backoff نمایی
 (۱→۲→۴→۸→۱۵ ثانیه + jitter) دوباره وصل می‌شود.
@@ -172,3 +196,36 @@ heartbeat هر ۲۵ ثانیه، timeout در ۶۰ ثانیه. کلاینت با
 اگر `DATABASE_URL` ست نباشد، برنامه به **حالت in-memory** می‌رود:
 دیتای نمونه در حافظه ساخته می‌شود تا بشود UI را بدون Postgres دید.
 این حالت فقط برای توسعه است و با ری‌استارت پاک می‌شود.
+
+---
+
+## فایل‌ها و پیوست‌ها
+
+فایل‌ها روی دیسک نگه داشته می‌شوند، نه S3 — این پروژه self-hosted است و یک
+volume ساده کافی است.
+
+```
+deploy/uploads  ──(bind mount)──▶  /srv/uploads  (داخل کانتینر web)
+```
+
+- نام روی دیسک یک UUID + پسوند پاک‌شده است؛ هیچ بخشی از نام کاربر وارد مسیر نمی‌شود.
+- نوع فایل با allow-list بررسی می‌شود؛ `image/svg+xml` عمداً مجاز نیست
+  چون SVG می‌تواند اسکریپت داشته باشد.
+- ابعاد تصویر بدون کتابخانهٔ خارجی از هدر PNG/GIF/JPEG/WebP خوانده می‌شود تا
+  UI بتواند جای تصویر را از قبل رزرو کند و چیدمان نپرد.
+- `GET /api/files/:name` نیازمند ورود است و با
+  `Content-Security-Policy: default-src 'none'; sandbox` سرو می‌شود.
+- بکاپ روزانه پوشهٔ `uploads` را هم برمی‌دارد (با `SKIP_UPLOADS=1` قابل حذف است).
+
+---
+
+## خوانده‌نشده‌ها
+
+دو جدول کوچک این کار را می‌کنند:
+
+- `read_state(user_id, channel_id, last_read_at)` — آخرین لحظهٔ خواندن
+- `mentions(message_id, user_id, channel_id, seen)` — منشن‌های دیده‌نشده
+
+`GET /api/bootstrap` شمارش اولیه را می‌دهد، کلاینت با هر `message_create`
+شمارنده را محلی بالا می‌برد، و با باز کردن کانال پیام `ack_read` روی سوکت
+می‌فرستد تا در همهٔ دستگاه‌ها صفر شود.

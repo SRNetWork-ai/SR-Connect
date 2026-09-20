@@ -436,6 +436,9 @@ build_and_start() {
   fi
 
   step "بالا آوردن سرویس‌ها"
+  # پوشه‌های داده قبل از اولین اجرا ساخته می‌شوند تا داکر آن‌ها را root نسازد.
+  mkdir -p releases uploads
+  chown -R 1001:1001 releases uploads 2>/dev/null || true
   docker compose up -d --remove-orphans >/dev/null
   ok "کانتینرها اجرا شدند"
 

@@ -30,10 +30,72 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Unit tests
+        run: npm test
+
       - name: Build
         run: npm run build
         env:
           NEXT_TELEMETRY_DISABLED: "1"
+
+  e2e:
+    name: E2E (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: sr
+          POSTGRES_PASSWORD: sr
+          POSTGRES_DB: srconnect
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U sr -d srconnect"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgres://sr:sr@127.0.0.1:5432/srconnect
+      NEXT_TELEMETRY_DISABLED: "1"
+      E2E_USERNAME: e2e
+      E2E_PASSWORD: "E2e-passw0rd!"
+      ADMIN_USERNAME: e2e
+      ADMIN_PASSWORD: "E2e-passw0rd!"
+      ADMIN_DISPLAY_NAME: تست خودکار
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Migrate & seed
+        run: |
+          npm run migrate
+          npm run seed
+
+      - name: Build
+        run: npm run build --workspace @sr/web
+
+      - name: Install browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Run E2E
+        run: npm run test:e2e
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report
+          retention-days: 7
 
   scripts:
     name: Shell scripts

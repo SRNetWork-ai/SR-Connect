@@ -1,7 +1,8 @@
 import { createHash, randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
 import { q } from "@/lib/db/pool";
-import { handle, requireUser } from "@/lib/auth/guard";
+import { handle, HttpError, requireUser } from "@/lib/auth/guard";
+import { rateLimit, RATE } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -9,6 +10,10 @@ export const dynamic = "force-dynamic";
 export function POST() {
   return handle(async () => {
     const user = await requireUser();
+
+    const limited = rateLimit(`tk:${user.id}`, RATE.ticket.limit, RATE.ticket.windowMs);
+    if (!limited.ok) throw new HttpError(429, "درخواست بلیت بیش از حد");
+
     const token = randomBytes(32).toString("base64url");
     const hash = createHash("sha256").update(token).digest("hex");
 

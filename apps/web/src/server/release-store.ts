@@ -7,13 +7,7 @@ import { DEV_DELTA_RATIO, DEV_FULL_SIZE, devBytes } from "./dev-artifacts";
 import { signHash } from "./signing";
 
 export type ForceState =
-  | "default"
-  | "uptodate"
-  | "optional"
-  | "mandatory"
-  | "minclient"
-  | "apibump"
-  | "rollout";
+  "default" | "uptodate" | "optional" | "mandatory" | "minclient" | "apibump" | "rollout";
 
 export interface ReleaseRow {
   version: string;
@@ -119,7 +113,8 @@ export async function buildManifest(opts: {
   const delta =
     latest === clientVersion
       ? undefined
-      : (row?.artifacts?.delta?.[clientVersion] ?? (row ? undefined : devArtifact(latest, clientVersion)));
+      : (row?.artifacts?.delta?.[clientVersion] ??
+        (row ? undefined : devArtifact(latest, clientVersion)));
 
   return {
     latest,

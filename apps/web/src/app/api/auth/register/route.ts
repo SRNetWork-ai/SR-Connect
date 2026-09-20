@@ -4,6 +4,7 @@ import { serverEnv } from "@/lib/env";
 import { hashPassword, passwordProblems } from "@/lib/auth/password";
 import { createSession, sessionCookie } from "@/lib/auth/session";
 import { handle, HttpError } from "@/lib/auth/guard";
+import { clientIp, rateLimit, RATE } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,9 @@ const COLORS = ["#5865F2", "#23A55A", "#F0B232", "#EB459E", "#00A8FC", "#9B59B6"
 export function POST(req: Request) {
   return handle(async () => {
     if (!serverEnv.allowRegistration) throw new HttpError(403, "ثبت‌نام روی این سرور بسته است");
+
+    const limited = rateLimit(`reg:${clientIp(req)}`, RATE.register.limit, RATE.register.windowMs);
+    if (!limited.ok) throw new HttpError(429, "تعداد ثبت‌نام از این آی‌پی زیاد شد");
 
     const body = (await req.json().catch(() => ({}))) as {
       username?: string;
@@ -79,7 +83,8 @@ export function POST(req: Request) {
 
       const roleId =
         inviteRoleId ??
-        (await c.query<{ id: string }>(`select id from roles where is_default limit 1`)).rows[0]?.id;
+        (await c.query<{ id: string }>(`select id from roles where is_default limit 1`)).rows[0]
+          ?.id;
       if (roleId) {
         await c.query(`insert into user_roles (user_id, role_id) values ($1, $2)`, [id, roleId]);
       }

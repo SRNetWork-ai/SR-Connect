@@ -15,6 +15,8 @@ interface UserRow {
   username: string;
   display_name: string;
   avatar_color: string;
+  avatar_url: string | null;
+  bio: string | null;
   status: PublicUser["status"];
   is_admin: boolean;
   roles: { id: string; name: string; color: string }[] | null;
@@ -22,7 +24,7 @@ interface UserRow {
 }
 
 const USER_SELECT = `
-  select u.id, u.username, u.display_name, u.avatar_color, u.status, u.is_admin,
+  select u.id, u.username, u.display_name, u.avatar_color, u.avatar_url, u.bio, u.status, u.is_admin,
          coalesce(
            json_agg(json_build_object('id', r.id, 'name', r.name, 'color', r.color))
              filter (where r.id is not null),
@@ -43,6 +45,8 @@ function toUser(row: UserRow): SessionUser {
     username: row.username,
     displayName: row.display_name,
     avatarColor: row.avatar_color,
+    avatarUrl: row.avatar_url,
+    bio: row.bio,
     status: row.status,
     isAdmin: row.is_admin,
     roles: row.roles ?? [],

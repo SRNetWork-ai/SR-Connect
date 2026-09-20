@@ -12,6 +12,7 @@ interface TokenResponse {
   url: string;
   room: string;
   canSpeak: boolean;
+  canShare?: boolean;
   channel: { id: string; name: string; userLimit: number };
 }
 
@@ -22,6 +23,11 @@ interface VoiceState {
   muted: boolean;
   deafened: boolean;
   canSpeak: boolean;
+  canShare: boolean;
+  /** آیا خودمان در حال اشتراک صفحه هستیم. */
+  streaming: boolean;
+  /** استریم‌های دریافتی: شناسه‌ی کاربر به MediaStream. */
+  screens: { userId: string; displayName: string; stream: MediaStream }[];
   /** شناسه‌ی افرادی که همین لحظه صدایشان می‌آید (حلقه‌ی سبز دور آواتار). */
   speaking: string[];
   ping: number | null;
@@ -31,6 +37,7 @@ interface VoiceState {
   leave(): Promise<void>;
   toggleMute(): Promise<void>;
   toggleDeafen(): Promise<void>;
+  toggleScreenShare(): Promise<void>;
 }
 
 // اتاق LiveKit بیرون از state نگه داشته می‌شود؛ یک نمونه در کل اپ.
@@ -44,6 +51,9 @@ export const useVoice = create<VoiceState>()((set, get) => ({
   muted: false,
   deafened: false,
   canSpeak: true,
+  canShare: true,
+  streaming: false,
+  screens: [],
   speaking: [],
   ping: null,
   error: null,
@@ -74,19 +84,46 @@ export const useVoice = create<VoiceState>()((set, get) => ({
       r.on(RoomEvent.ActiveSpeakersChanged, (speakers) =>
         set({ speaking: speakers.map((s) => s.identity) }),
       );
-      r.on(RoomEvent.TrackSubscribed, (track) => {
+      r.on(RoomEvent.TrackSubscribed, (track, _pub, participant) => {
         if (track.kind === Track.Kind.Audio) {
           const el = track.attach();
           el.autoplay = true;
           el.muted = get().deafened;
           el.dataset.srVoice = "1";
           document.body.append(el);
+          return;
+        }
+        // ویدئوی اشتراک صفحه را به‌جای DOM مستقیم، به state می‌دهیم تا React بچیند.
+        if (track.source === Track.Source.ScreenShare && track.mediaStream) {
+          set((st) => ({
+            screens: [
+              ...st.screens.filter((s2) => s2.userId !== participant.identity),
+              {
+                userId: participant.identity,
+                displayName: participant.name || participant.identity,
+                stream: track.mediaStream!,
+              },
+            ],
+          }));
         }
       });
-      r.on(RoomEvent.TrackUnsubscribed, (track) => track.detach().forEach((el) => el.remove()));
+      r.on(RoomEvent.TrackUnsubscribed, (track, _pub, participant) => {
+        track.detach().forEach((el) => el.remove());
+        if (track.source === Track.Source.ScreenShare) {
+          set((st) => ({ screens: st.screens.filter((s2) => s2.userId !== participant.identity) }));
+        }
+      });
       r.on(RoomEvent.Disconnected, () => {
         useSession.getState().setInCall(false);
-        set({ status: "idle", channelId: null, channelName: null, speaking: [], ping: null });
+        set({
+          status: "idle",
+          channelId: null,
+          channelName: null,
+          speaking: [],
+          screens: [],
+          streaming: false,
+          ping: null,
+        });
         useApp.getState().publishVoiceState({ channelId: null, muted: false, deafened: false });
       });
 
@@ -99,7 +136,10 @@ export const useVoice = create<VoiceState>()((set, get) => ({
         channelId,
         channelName: auth.channel.name,
         canSpeak: auth.canSpeak,
+        canShare: auth.canShare ?? auth.canSpeak,
         muted: !auth.canSpeak,
+        streaming: false,
+        screens: [],
         error: null,
       });
 
@@ -138,7 +178,15 @@ export const useVoice = create<VoiceState>()((set, get) => ({
       room = null;
     }
     useSession.getState().setInCall(false);
-    set({ status: "idle", channelId: null, channelName: null, speaking: [], ping: null });
+    set({
+      status: "idle",
+      channelId: null,
+      channelName: null,
+      speaking: [],
+      screens: [],
+      streaming: false,
+      ping: null,
+    });
     useApp.getState().publishVoiceState({ channelId: null, muted: false, deafened: false });
   },
 
@@ -164,5 +212,31 @@ export const useVoice = create<VoiceState>()((set, get) => ({
     }
     const { channelId, muted } = get();
     useApp.getState().publishVoiceState({ channelId, muted, deafened: next });
+  },
+
+  /** اشتراک صفحه با صدای سیستم (اگر مرورگر اجازه دهد). */
+  async toggleScreenShare() {
+    if (!room) return;
+    const next = !get().streaming;
+    if (next && !get().canShare) {
+      useApp.getState().pushToast("اجازه‌ی اشتراک صفحه در این کانال را نداری", "error");
+      return;
+    }
+    try {
+      await room.localParticipant.setScreenShareEnabled(next, {
+        audio: true,
+        resolution: { width: 1280, height: 720, frameRate: 15 },
+      });
+      set({ streaming: next });
+      const { channelId, muted, deafened } = get();
+      useApp.getState().publishVoiceState({ channelId, muted, deafened, streaming: next });
+    } catch (err) {
+      // کاربر پنجره‌ی انتخاب را بست — خطا نیست.
+      const message = (err as Error).message ?? "";
+      if (!/Permission denied|NotAllowedError|canceled/i.test(message)) {
+        useApp.getState().pushToast("اشتراک صفحه شروع نشد", "error");
+      }
+      set({ streaming: false });
+    }
   },
 }));

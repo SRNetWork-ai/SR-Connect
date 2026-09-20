@@ -2,9 +2,9 @@
 
 SR-Connect دو نوع آپدیت دارد که نباید با هم اشتباه شوند:
 
-| نوع | چه چیزی آپدیت می‌شود | چطور |
-|---|---|---|
-| **آپدیت سرور** | خود نصب روی سرور شما | `update.sh` (git pull + rebuild) |
+| نوع              | چه چیزی آپدیت می‌شود     | چطور                              |
+| ---------------- | ------------------------ | --------------------------------- |
+| **آپدیت سرور**   | خود نصب روی سرور شما     | `update.sh` (git pull + rebuild)  |
 | **آپدیت کلاینت** | اپ دسکتاپ/موبایل کاربران | پکیج امضاشده که سرور منتشر می‌کند |
 
 ---
@@ -60,10 +60,12 @@ npm run keygen -- deploy/keys   # ← deploy/keys/update-signing.{key,pub}
 ```
 
 خروجی:
+
 - `update-signing.key` — کلید خصوصی Ed25519 به‌صورت PEM (**هرگز کامیت نکن**، `chmod 600`)
 - `update-signing.pub` — کلید عمومی، base64 خام ۳۲ بایتی — همان چیزی که WebCrypto می‌خواهد
 
 در `.env`:
+
 ```
 UPDATE_SIGNING_KEY=<base64 -w0 از فایل PEM خصوصی>
 UPDATE_PUBKEY=<محتوای update-signing.pub>
@@ -83,6 +85,7 @@ npm run sign-release -- \
 ```
 
 این دستور:
+
 1. دایجست SHA-256 را حساب می‌کند
 2. با `UPDATE_SIGNING_KEY` امضا می‌زند
 3. فایل را در `RELEASES_DIR` کپی می‌کند
@@ -95,12 +98,12 @@ npm run sign-release -- \
 
 ### مسیرهای API
 
-| مسیر | کار |
-|---|---|
-| `GET /api/version?platform=win&channel=stable` | manifest نسخهٔ فعلی |
-| `GET /api/artifact/:name` | دانلود فایل پکیج |
-| `GET /api/admin/releases` | فهرست همهٔ نسخه‌ها (ادمین) |
-| `PATCH /api/admin/releases` | انتشار / لغو انتشار / تغییر کانال |
+| مسیر                                           | کار                               |
+| ---------------------------------------------- | --------------------------------- |
+| `GET /api/version?platform=win&channel=stable` | manifest نسخهٔ فعلی               |
+| `GET /api/artifact/:name`                      | دانلود فایل پکیج                  |
+| `GET /api/admin/releases`                      | فهرست همهٔ نسخه‌ها (ادمین)        |
+| `PATCH /api/admin/releases`                    | انتشار / لغو انتشار / تغییر کانال |
 
 ### کانال‌های انتشار و انتشار تدریجی
 

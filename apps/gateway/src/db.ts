@@ -24,7 +24,9 @@ export async function q<T extends pg.QueryResultRow = pg.QueryResultRow>(
 
 export type DbEvent =
   | { type: "message_create"; channelId: string; messageId: string }
+  | { type: "message_update"; channelId: string; messageId: string }
   | { type: "message_delete"; channelId: string; messageId: string }
+  | { type: "reaction_update"; channelId: string; messageId: string }
   | { type: "channels_changed" }
   | { type: "release_published"; version: string; mandatory: boolean };
 

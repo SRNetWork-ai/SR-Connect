@@ -2,11 +2,14 @@
 
 import { create } from "zustand";
 import type {
+  Attachment,
   Category,
   Channel,
   ChatMessage,
   PresenceStatus,
   PublicUser,
+  Reaction,
+  ReadState,
   VoiceParticipant,
 } from "@sr/protocol";
 import { api } from "@/lib/api";
@@ -16,18 +19,30 @@ export interface Member extends PublicUser {
   lastSeenAt?: string | null;
 }
 
+export interface Toast {
+  id: string;
+  kind: "info" | "success" | "error";
+  text: string;
+}
+
 interface Bootstrap {
   user: PublicUser & { permissions: number };
   categories: Category[];
   channels: Channel[];
   members: Member[];
+  readState: ReadState[];
   stats: { members: number; online: number; voiceCapacity: number; uptimeSeconds: number };
-  features: { voice: boolean; registration: boolean; requireInvite: boolean };
+  features: { voice: boolean; registration: boolean; requireInvite: boolean; uploads: boolean };
 }
 
 interface TypingEntry {
   displayName: string;
   expiresAt: number;
+}
+
+export interface Unread {
+  unread: number;
+  mentions: number;
 }
 
 interface AppState {
@@ -47,6 +62,10 @@ interface AppState {
   presence: Record<string, PresenceStatus>;
   typing: Record<string, Record<string, TypingEntry>>;
   voice: Record<string, VoiceParticipant[]>;
+  unread: Record<string, Unread>;
+  replyTarget: ChatMessage | null;
+  editingId: string | null;
+  toasts: Toast[];
   versionHint: { latest: string; mandatory: boolean; minClient: string } | null;
   socket: RealtimeSocket | null;
 
@@ -54,7 +73,19 @@ interface AppState {
   teardown(): void;
   setActiveChannel(id: string): void;
   loadHistory(channelId: string, opts?: { older?: boolean }): Promise<void>;
-  sendMessage(channelId: string, content: string): Promise<void>;
+  sendMessage(channelId: string, content: string, files?: File[]): Promise<void>;
+  editMessage(channelId: string, messageId: string, content: string): Promise<void>;
+  deleteMessage(channelId: string, messageId: string): Promise<void>;
+  toggleReaction(channelId: string, messageId: string, emoji: string): Promise<void>;
+  setReplyTarget(message: ChatMessage | null): void;
+  setEditing(messageId: string | null): void;
+  markRead(channelId: string): void;
+  updateProfile(patch: {
+    displayName?: string;
+    bio?: string;
+    avatarColor?: string;
+    avatar?: File | null;
+  }): Promise<void>;
   sendTyping(channelId: string): void;
   refreshChannels(): Promise<void>;
   setPresence(status: PresenceStatus): void;
@@ -64,10 +95,37 @@ interface AppState {
     deafened: boolean;
     streaming?: boolean;
   }): void;
+  pushToast(text: string, kind?: Toast["kind"]): void;
+  dismissToast(id: string): void;
   dismissVersionHint(): void;
 }
 
 const typingCooldown = new Map<string, number>();
+
+/** جای‌گذاری یک پیام در لیست کانال، بدون تغییر ترتیب. */
+function replaceIn(list: ChatMessage[], message: ChatMessage): ChatMessage[] {
+  let found = false;
+  const next = list.map((m) => {
+    if (m.id !== message.id) return m;
+    found = true;
+    return { ...m, ...message };
+  });
+  return found ? next : [...next, message];
+}
+
+function patchMessage(
+  messages: Record<string, ChatMessage[]>,
+  channelId: string,
+  messageId: string,
+  patch: Partial<ChatMessage>,
+): Record<string, ChatMessage[]> {
+  const list = messages[channelId];
+  if (!list) return messages;
+  return {
+    ...messages,
+    [channelId]: list.map((m) => (m.id === messageId ? { ...m, ...patch } : m)),
+  };
+}
 
 export const useApp = create<AppState>()((set, get) => ({
   ready: false,
@@ -78,7 +136,7 @@ export const useApp = create<AppState>()((set, get) => ({
   channels: [],
   members: [],
   stats: null,
-  features: { voice: false, registration: true, requireInvite: false },
+  features: { voice: false, registration: true, requireInvite: false, uploads: true },
   activeChannelId: null,
   messages: {},
   hasMore: {},
@@ -86,6 +144,10 @@ export const useApp = create<AppState>()((set, get) => ({
   presence: {},
   typing: {},
   voice: {},
+  unread: {},
+  replyTarget: null,
+  editingId: null,
+  toasts: [],
   versionHint: null,
   socket: null,
 
@@ -94,6 +156,7 @@ export const useApp = create<AppState>()((set, get) => ({
     try {
       const data = await api.get<Bootstrap>("/api/bootstrap");
       const firstText = data.channels.find((c) => c.type === "text") ?? data.channels[0];
+      const activeChannelId = get().activeChannelId ?? firstText?.id ?? null;
       set({
         ready: true,
         error: null,
@@ -103,7 +166,13 @@ export const useApp = create<AppState>()((set, get) => ({
         members: data.members,
         stats: data.stats,
         features: data.features,
-        activeChannelId: get().activeChannelId ?? firstText?.id ?? null,
+        activeChannelId,
+        unread: Object.fromEntries(
+          (data.readState ?? []).map((r) => [
+            r.channelId,
+            { unread: r.channelId === activeChannelId ? 0 : r.unread, mentions: r.mentions },
+          ]),
+        ),
         presence: Object.fromEntries(data.members.map((m) => [m.id, m.status])),
       });
 
@@ -118,12 +187,55 @@ export const useApp = create<AppState>()((set, get) => ({
                 socket.subscribe(state.channels.map((c) => c.id));
                 break;
               case "message_create": {
-                const list = state.messages[msg.message.channelId] ?? [];
+                const channelId = msg.message.channelId;
+                const list = state.messages[channelId] ?? [];
                 if (list.some((m) => m.id === msg.message.id)) break;
+                const mine = msg.message.author.id === state.me?.id;
+                const focused =
+                  channelId === state.activeChannelId &&
+                  typeof document !== "undefined" &&
+                  document.visibilityState === "visible";
+                const prev = state.unread[channelId] ?? { unread: 0, mentions: 0 };
+                const mentioned = !!state.me && msg.message.content.includes(`<@${state.me.id}>`);
+                set({
+                  messages: { ...state.messages, [channelId]: [...list, msg.message].slice(-500) },
+                  unread:
+                    mine || focused
+                      ? state.unread
+                      : {
+                          ...state.unread,
+                          [channelId]: {
+                            unread: prev.unread + 1,
+                            mentions: prev.mentions + (mentioned ? 1 : 0),
+                          },
+                        },
+                });
+                break;
+              }
+              case "message_update": {
+                const list = state.messages[msg.message.channelId];
+                if (!list) break;
                 set({
                   messages: {
                     ...state.messages,
-                    [msg.message.channelId]: [...list, msg.message].slice(-500),
+                    [msg.message.channelId]: replaceIn(list, msg.message),
+                  },
+                });
+                break;
+              }
+              case "reaction_update": {
+                set({
+                  messages: patchMessage(state.messages, msg.channelId, msg.messageId, {
+                    reactions: msg.reactions,
+                  }),
+                });
+                break;
+              }
+              case "read_state": {
+                set({
+                  unread: {
+                    ...state.unread,
+                    [msg.channelId]: { unread: msg.unread, mentions: msg.mentions },
                   },
                 });
                 break;
@@ -165,6 +277,7 @@ export const useApp = create<AppState>()((set, get) => ({
                 break;
               case "error":
                 if (msg.code === "unauthorized") set({ error: msg.message });
+                else get().pushToast(msg.message, "error");
                 break;
               default:
                 break;
@@ -188,8 +301,17 @@ export const useApp = create<AppState>()((set, get) => ({
   },
 
   setActiveChannel(id) {
-    set({ activeChannelId: id });
+    set({ activeChannelId: id, replyTarget: null, editingId: null });
     if (!get().messages[id]) void get().loadHistory(id);
+    get().markRead(id);
+  },
+
+  markRead(channelId) {
+    const current = get().unread[channelId];
+    if (current && current.unread === 0 && current.mentions === 0) return;
+    set((s) => ({ unread: { ...s.unread, [channelId]: { unread: 0, mentions: 0 } } }));
+    const last = (get().messages[channelId] ?? []).at(-1);
+    get().socket?.send({ t: "ack_read", channelId, messageId: last?.id ?? "" });
   },
 
   async loadHistory(channelId, opts) {
@@ -216,12 +338,13 @@ export const useApp = create<AppState>()((set, get) => ({
     }
   },
 
-  async sendMessage(channelId, content) {
+  async sendMessage(channelId, content, files) {
     const trimmed = content.trim();
-    if (!trimmed) return;
+    const hasFiles = Boolean(files?.length);
+    if (!trimmed && !hasFiles) return;
 
-    // پیام را همان لحظه نشان می‌دهیم؛ اگر سرور خطا داد برمی‌گردانیم.
-    const optimisticId = `tmp-${Date.now()}`;
+    const replyTarget = get().replyTarget;
+    const optimisticId = `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     const me = get().me;
     if (me) {
       const optimistic: ChatMessage = {
@@ -230,23 +353,46 @@ export const useApp = create<AppState>()((set, get) => ({
         content: trimmed,
         createdAt: new Date().toISOString(),
         editedAt: null,
-        replyTo: null,
+        replyTo: replyTarget?.id ?? null,
+        replyPreview: replyTarget
+          ? {
+              id: replyTarget.id,
+              authorName: replyTarget.author.displayName,
+              authorColor: replyTarget.author.avatarColor,
+              excerpt: replyTarget.content.slice(0, 140),
+              deleted: false,
+            }
+          : null,
         system: false,
+        pending: true,
+        attachments: [],
+        reactions: [],
         author: {
           id: me.id,
           username: me.username,
           displayName: me.displayName,
           avatarColor: me.avatarColor,
+          avatarUrl: me.avatarUrl,
         },
       };
       set((s) => ({
         messages: { ...s.messages, [channelId]: [...(s.messages[channelId] ?? []), optimistic] },
+        replyTarget: null,
       }));
     }
 
     try {
+      let attachmentIds: string[] | undefined;
+      if (hasFiles) {
+        const form = new FormData();
+        for (const file of files!) form.append("files", file);
+        const up = await api.upload<{ attachments: Attachment[] }>("/api/uploads", form);
+        attachmentIds = up.attachments.map((a) => a.id);
+      }
       const res = await api.post<{ message: ChatMessage }>(`/api/channels/${channelId}/messages`, {
         content: trimmed,
+        replyTo: replyTarget?.id ?? null,
+        attachmentIds,
       });
       set((s) => {
         const list = s.messages[channelId] ?? [];
@@ -261,12 +407,125 @@ export const useApp = create<AppState>()((set, get) => ({
       });
     } catch (err) {
       set((s) => ({
-        error: (err as Error).message,
-        messages: {
-          ...s.messages,
-          [channelId]: (s.messages[channelId] ?? []).filter((m) => m.id !== optimisticId),
-        },
+        messages: patchMessage(s.messages, channelId, optimisticId, {
+          pending: false,
+          failed: true,
+        }),
       }));
+      get().pushToast((err as Error).message, "error");
+    }
+  },
+
+  async editMessage(channelId, messageId, content) {
+    const trimmed = content.trim();
+    if (!trimmed) return;
+    const before = (get().messages[channelId] ?? []).find((m) => m.id === messageId);
+    set((s) => ({
+      messages: patchMessage(s.messages, channelId, messageId, {
+        content: trimmed,
+        editedAt: new Date().toISOString(),
+      }),
+      editingId: null,
+    }));
+    try {
+      const res = await api.patch<{ message: ChatMessage }>(
+        `/api/channels/${channelId}/messages/${messageId}`,
+        { content: trimmed },
+      );
+      set((s) => ({
+        messages: patchMessage(s.messages, channelId, messageId, res.message),
+      }));
+    } catch (err) {
+      if (before) {
+        set((s) => ({ messages: patchMessage(s.messages, channelId, messageId, before) }));
+      }
+      get().pushToast((err as Error).message, "error");
+    }
+  },
+
+  async deleteMessage(channelId, messageId) {
+    const snapshot = get().messages[channelId] ?? [];
+    set((s) => ({
+      messages: {
+        ...s.messages,
+        [channelId]: (s.messages[channelId] ?? []).filter((m) => m.id !== messageId),
+      },
+    }));
+    try {
+      await api.del(`/api/channels/${channelId}/messages/${messageId}`);
+      get().pushToast("پیام حذف شد", "success");
+    } catch (err) {
+      set((s) => ({ messages: { ...s.messages, [channelId]: snapshot } }));
+      get().pushToast((err as Error).message, "error");
+    }
+  },
+
+  async toggleReaction(channelId, messageId, emoji) {
+    const list = get().messages[channelId] ?? [];
+    const message = list.find((m) => m.id === messageId);
+    if (!message) return;
+    const current = message.reactions ?? [];
+    const existing = current.find((r) => r.emoji === emoji);
+    const mine = existing?.me ?? false;
+
+    // به‌روزرسانی خوش‌بینانه تا کلیک حس فوری بدهد.
+    const optimistic: Reaction[] = mine
+      ? current
+          .map((r) => (r.emoji === emoji ? { ...r, count: r.count - 1, me: false } : r))
+          .filter((r) => r.count > 0)
+      : existing
+        ? current.map((r) => (r.emoji === emoji ? { ...r, count: r.count + 1, me: true } : r))
+        : [...current, { emoji, count: 1, me: true }];
+    set((s) => ({
+      messages: patchMessage(s.messages, channelId, messageId, { reactions: optimistic }),
+    }));
+
+    try {
+      const path = `/api/channels/${channelId}/messages/${messageId}/reactions`;
+      const res = mine
+        ? await api.del<{ reactions: Reaction[] }>(`${path}?emoji=${encodeURIComponent(emoji)}`)
+        : await api.post<{ reactions: Reaction[] }>(path, { emoji });
+      set((s) => ({
+        messages: patchMessage(s.messages, channelId, messageId, { reactions: res.reactions }),
+      }));
+    } catch (err) {
+      set((s) => ({
+        messages: patchMessage(s.messages, channelId, messageId, { reactions: current }),
+      }));
+      get().pushToast((err as Error).message, "error");
+    }
+  },
+
+  setReplyTarget(message) {
+    set({ replyTarget: message, editingId: null });
+  },
+
+  setEditing(messageId) {
+    set({ editingId: messageId, replyTarget: null });
+  },
+
+  async updateProfile(patch) {
+    try {
+      let avatarAttachmentId: string | undefined;
+      if (patch.avatar) {
+        const form = new FormData();
+        form.append("avatar", patch.avatar);
+        const up = await api.upload<{ attachment: Attachment }>("/api/uploads?kind=avatar", form);
+        avatarAttachmentId = up.attachment.id;
+      }
+      const res = await api.patch<{ user: PublicUser & { permissions: number } }>("/api/users/me", {
+        displayName: patch.displayName,
+        bio: patch.bio,
+        avatarColor: patch.avatarColor,
+        avatarAttachmentId,
+      });
+      set((s) => ({
+        me: res.user,
+        members: s.members.map((m) => (m.id === res.user.id ? { ...m, ...res.user } : m)),
+      }));
+      get().pushToast("پروفایل ذخیره شد", "success");
+    } catch (err) {
+      get().pushToast((err as Error).message, "error");
     }
   },
 
@@ -307,6 +566,16 @@ export const useApp = create<AppState>()((set, get) => ({
       deafened,
       streaming: streaming ?? false,
     });
+  },
+
+  pushToast(text, kind = "info") {
+    const id = `t-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    set((s) => ({ toasts: [...s.toasts, { id, text, kind }].slice(-4) }));
+    setTimeout(() => get().dismissToast(id), 4_500);
+  },
+
+  dismissToast(id) {
+    set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) }));
   },
 
   dismissVersionHint() {

@@ -56,51 +56,51 @@ export function UpdateBanner() {
     <Collapse open={Boolean(banner)}>
       {banner && (
         <div
-            className={`flex items-center gap-3 px-4 py-2 text-sm ${
-              banner.kind === "mandatory" ? "bg-danger" : "bg-brand"
-            } text-white`}
-          >
+          className={`flex items-center gap-3 px-4 py-2 text-sm ${
+            banner.kind === "mandatory" ? "bg-danger" : "bg-brand"
+          } text-white`}
+        >
+          {banner.kind === "deferred" ? (
+            <PhoneCall className="size-4 shrink-0" />
+          ) : (
+            <Download className="size-4 shrink-0" />
+          )}
+
+          <p className="flex-1">
             {banner.kind === "deferred" ? (
-              <PhoneCall className="size-4 shrink-0" />
+              <>
+                نسخه <span className="tnum font-bold">{fa(banner.target)}</span> آماده است؛ بعد از
+                پایان تماس صوتی نصب می‌شود.
+              </>
             ) : (
-              <Download className="size-4 shrink-0" />
+              <>
+                نسخه <span className="tnum font-bold">{fa(banner.target)}</span>{" "}
+                {banner.kind === "mandatory" ? "اجباری است" : "منتشر شد"}. با یک بازنشانی نصب
+                می‌شود.
+              </>
             )}
+          </p>
 
-            <p className="flex-1">
-              {banner.kind === "deferred" ? (
-                <>
-                  نسخه <span className="tnum font-bold">{fa(banner.target)}</span> آماده است؛ بعد
-                  از پایان تماس صوتی نصب می‌شود.
-                </>
-              ) : (
-                <>
-                  نسخه <span className="tnum font-bold">{fa(banner.target)}</span>{" "}
-                  {banner.kind === "mandatory" ? "اجباری است" : "منتشر شد"}. با یک بازنشانی نصب
-                  می‌شود.
-                </>
-              )}
-            </p>
+          {banner.kind !== "deferred" && (
+            <Button
+              size="sm"
+              variant="neutral"
+              className="bg-white/15 text-white hover:bg-white/25"
+              onClick={() => void relaunch()}
+            >
+              بازنشانی و نصب
+            </Button>
+          )}
 
-            {banner.kind !== "deferred" && (
-              <Button
-                size="sm"
-                variant="neutral"
-                className="bg-white/15 text-white hover:bg-white/25"
-                onClick={() => void relaunch()}
-              >
-                بازنشانی و نصب
-              </Button>
-            )}
-
-            {banner.kind !== "mandatory" && (
-              <button
-                onClick={() => setDismissed(true)}
-                className="grid size-6 place-items-center rounded transition-colors hover:bg-white/20"
-                title="بستن"
-              >
-                <X className="size-4" />
-              </button>
-            )}
+          {banner.kind !== "mandatory" && (
+            <button
+              onClick={() => setDismissed(true)}
+              className="grid size-6 place-items-center rounded transition-colors hover:bg-white/20"
+              title="بستن"
+            >
+              <X className="size-4" />
+            </button>
+          )}
         </div>
       )}
     </Collapse>

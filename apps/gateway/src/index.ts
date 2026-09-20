@@ -1,12 +1,13 @@
 import { createServer } from "node:http";
 import { randomUUID } from "node:crypto";
 import { WebSocketServer } from "ws";
-import type { ChatMessage, ClientMessage, PresenceStatus } from "@sr/protocol";
+import type { ClientMessage, PresenceStatus } from "@sr/protocol";
 import { API_VERSION, CLOSE_CODES, LIMITS } from "@sr/protocol";
 import { authenticate, markPresence } from "./auth.js";
 import { listenEvents, pool, q } from "./db.js";
 import { env } from "./env.js";
 import { Hub, type Conn } from "./hub.js";
+import { loadMessage, reactionUsers } from "./messages.js";
 import { compareSemver, currentVersion, refreshVersion } from "./version.js";
 
 const hub = new Hub();
@@ -14,7 +15,11 @@ const startedAt = Date.now();
 
 const http = createServer(async (req, res) => {
   const url = new URL(req.url ?? "/", "http://localhost");
-  if (url.pathname === "/health" || url.pathname === "/healthz" || url.pathname === "/gateway-health") {
+  if (
+    url.pathname === "/health" ||
+    url.pathname === "/healthz" ||
+    url.pathname === "/gateway-health"
+  ) {
     let db = false;
     try {
       await q("select 1");
@@ -126,6 +131,7 @@ wss.on("connection", (ws, req) => {
           username: user.username,
           displayName: user.displayName,
           avatarColor: user.avatarColor,
+          avatarUrl: user.avatarUrl,
           status: "online",
           isAdmin: user.isAdmin,
           roles: user.roles,
@@ -179,6 +185,14 @@ wss.on("connection", (ws, req) => {
         break;
       }
 
+      case "ack_read": {
+        if (typeof msg.channelId !== "string") break;
+        void markRead(c.user.id, msg.channelId).then(() =>
+          hub.send(c, { t: "read_state", channelId: msg.channelId, unread: 0, mentions: 0 }),
+        );
+        break;
+      }
+
       case "voice_state":
         hub.voiceState(
           c,
@@ -219,51 +233,40 @@ const heartbeat = setInterval(() => {
 }, LIMITS.heartbeatMs);
 
 // ---- رویدادهای دیتابیس ----------------------------------------------------
-async function loadMessage(messageId: string): Promise<ChatMessage | null> {
-  const rows = await q<{
-    id: string;
-    channel_id: string;
-    content: string;
-    created_at: Date;
-    edited_at: Date | null;
-    reply_to: string | null;
-    system: boolean;
-    author_id: string | null;
-    username: string | null;
-    display_name: string | null;
-    avatar_color: string | null;
-  }>(
-    `select m.id, m.channel_id, m.content, m.created_at, m.edited_at, m.reply_to, m.system,
-            u.id as author_id, u.username, u.display_name, u.avatar_color
-       from messages m left join users u on u.id = m.author_id
-      where m.id = $1 and m.deleted_at is null`,
-    [messageId],
-  );
-  const row = rows[0];
-  if (!row) return null;
-  return {
-    id: row.id,
-    channelId: row.channel_id,
-    content: row.content,
-    createdAt: row.created_at.toISOString(),
-    editedAt: row.edited_at ? row.edited_at.toISOString() : null,
-    replyTo: row.reply_to,
-    system: row.system,
-    author: {
-      id: row.author_id ?? "system",
-      username: row.username ?? "system",
-      displayName: row.display_name ?? "سیستم",
-      avatarColor: row.avatar_color ?? "#5865F2",
-    },
-  };
+/** علامت‌گذاری «خوانده شد» تا شمارنده‌ها بین دستگاه‌ها هم‌گام بمانند. */
+async function markRead(userId: string, channelId: string): Promise<void> {
+  try {
+    await q(
+      `insert into read_state (user_id, channel_id, last_read_at)
+            values ($1, $2, now())
+       on conflict (user_id, channel_id)
+       do update set last_read_at = now()`,
+      [userId, channelId],
+    );
+    await q(`update mentions set seen = true where user_id = $1 and channel_id = $2`, [
+      userId,
+      channelId,
+    ]);
+  } catch (err) {
+    console.warn("[gateway] ثبت وضعیت خواندن ناموفق:", (err as Error).message);
+  }
 }
 
 const stopListening = listenEvents((event) => {
   void (async () => {
     switch (event.type) {
       case "message_create": {
-        const message = await loadMessage(event.messageId);
-        if (message) hub.messageCreate(message);
+        const loaded = await loadMessage(event.messageId);
+        if (loaded) hub.messageCreate(loaded.message, loaded.reactions);
+        break;
+      }
+      case "message_update": {
+        const loaded = await loadMessage(event.messageId);
+        if (loaded) hub.messageUpdate(loaded.message, loaded.reactions);
+        break;
+      }
+      case "reaction_update": {
+        hub.reactionUpdate(event.channelId, event.messageId, await reactionUsers(event.messageId));
         break;
       }
       case "message_delete":

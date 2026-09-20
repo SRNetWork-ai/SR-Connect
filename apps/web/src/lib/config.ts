@@ -8,12 +8,11 @@ export const APP_NAME = "SR-Connect";
 export const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? "1.0.0";
 
 /** نسخه‌ی قراردادِ API که این کلاینت می‌فهمد. */
-export const CLIENT_API_VERSION = Number(process.env.NEXT_PUBLIC_API_VERSION ?? 3);
+export const CLIENT_API_VERSION = Number(process.env.NEXT_PUBLIC_API_VERSION ?? 4);
 
 export type UpdateChannel = "stable" | "beta" | "nightly";
 
-export const UPDATE_CHANNEL = (process.env.NEXT_PUBLIC_UPDATE_CHANNEL ??
-  "stable") as UpdateChannel;
+export const UPDATE_CHANNEL = (process.env.NEXT_PUBLIC_UPDATE_CHANNEL ?? "stable") as UpdateChannel;
 
 /** کلید عمومی Ed25519 برای بررسی امضای بسته‌ی آپدیت (base64، raw 32 بایت). */
 export const UPDATE_PUBKEY =

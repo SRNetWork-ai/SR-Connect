@@ -4,8 +4,13 @@
   "private": true,
   "description": "چت و صوت خودمیزبان — تجربه‌ی دیسکورد، هسته‌ی صوتی تیم‌اسپیک",
   "license": "MIT",
-  "workspaces": ["apps/*", "packages/*"],
-  "engines": { "node": ">=20" },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "npm run dev --workspace @sr/web",
     "dev:gateway": "npm run dev --workspace @sr/gateway",
@@ -17,11 +22,18 @@
     "sign-release": "node apps/web/scripts/sign-release.mjs",
     "fonts": "node scripts/fonts.mjs",
     "postinstall": "node scripts/fonts.mjs",
-    "format": "prettier --write \"**/*.{ts,tsx,css,md,json,yml,yaml}\""
+    "format": "prettier --write \"**/*.{ts,tsx,css,md,json,yml,yaml}\"",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "lint:format": "prettier --check \"**/*.{ts,tsx,css,md,json,yml,yaml}\""
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@vitejs/plugin-react": "^4.7.0",
     "prettier": "^3.4.2",
     "typescript": "^5.7.3",
-    "vazirmatn": "^33.0.3"
+    "vazirmatn": "^33.0.3",
+    "vitest": "^2.1.9"
   }
 }

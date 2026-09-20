@@ -5,6 +5,11 @@
 {$SR_DOMAIN} {
 	encode zstd gzip
 
+	# سقف حجم درخواست: کمی بالاتر از MAX_UPLOAD_BYTES تا هدرهای multipart جا شوند.
+	request_body {
+		max_size 30MB
+	}
+
 	header {
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		X-Content-Type-Options "nosniff"
@@ -25,6 +30,22 @@
 	# سیگنالینگ LiveKit؛ خود مدیا روی UDP جدا می‌رود.
 	handle_path /rtc* {
 		reverse_proxy host.docker.internal:7880
+	}
+
+	# پیوست‌ها: بدنه‌ی بزرگ و پاسخ طولانی، بدون فشرده‌سازی دوباره
+	handle /api/files/* {
+		reverse_proxy web:3000 {
+			flush_interval -1
+		}
+	}
+
+	handle /api/uploads* {
+		reverse_proxy web:3000 {
+			transport http {
+				read_timeout 300s
+				write_timeout 300s
+			}
+		}
 	}
 
 	# بقیه‌ی ترافیک → اپ Next.js

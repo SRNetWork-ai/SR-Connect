@@ -182,9 +182,7 @@ export function LoginForm() {
 
       <QrPanel />
 
-      <span className="tnum absolute bottom-2 end-3 text-2xs text-t5">
-        نسخه {fa(APP_VERSION)}
-      </span>
+      <span className="tnum absolute bottom-2 end-3 text-2xs text-t5">نسخه {fa(APP_VERSION)}</span>
     </Reveal>
   );
 }

@@ -268,7 +268,8 @@ export function UpdateCenter() {
             <h2 className="text-base font-bold text-t1">مدیریت انتشار</h2>
             {signingConfigured === false && (
               <p className="mt-2 rounded-md bg-warning-soft px-3 py-2 text-sm text-warning">
-                کلید امضای Ed25519 روی این سرور تنظیم نشده؛ تا آن را نگذاری انتشار امضاشده ممکن نیست.
+                کلید امضای Ed25519 روی این سرور تنظیم نشده؛ تا آن را نگذاری انتشار امضاشده ممکن
+                نیست.
               </p>
             )}
 

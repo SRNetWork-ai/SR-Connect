@@ -87,9 +87,7 @@ export function SplashScreen({ theatrical = false }: { theatrical?: boolean }) {
             <Logo size={56} glow />
             <div className="flex-1">
               <Wordmark className="text-xl" />
-              <p className="mt-0.5 text-sm text-t4">
-                در حال آماده‌سازی اتصال به سرور خودی…
-              </p>
+              <p className="mt-0.5 text-sm text-t4">در حال آماده‌سازی اتصال به سرور خودی…</p>
             </div>
             <div className="text-end">
               <div className="tnum text-sm font-semibold text-t2">{fa(APP_VERSION)}</div>
@@ -148,7 +146,13 @@ export function SplashScreen({ theatrical = false }: { theatrical?: boolean }) {
             </div>
             <Progress
               value={progress}
-              tone={phase === "blocked" || phase === "failed" ? "danger" : phase === "ready" ? "success" : "brand"}
+              tone={
+                phase === "blocked" || phase === "failed"
+                  ? "danger"
+                  : phase === "ready"
+                    ? "success"
+                    : "brand"
+              }
             />
           </div>
 
@@ -168,8 +172,9 @@ export function SplashScreen({ theatrical = false }: { theatrical?: boolean }) {
 
             {decision?.kind === "offline" && (
               <Notice tone="warning" icon={<WifiOff className="size-4" />}>
-                {decision.error}. اپ با نسخه‌ی <span className="tnum">{fa(decision.cachedVersion)}</span>{" "}
-                باز می‌شود و بررسی نسخه در پس‌زمینه تکرار می‌شود.
+                {decision.error}. اپ با نسخه‌ی{" "}
+                <span className="tnum">{fa(decision.cachedVersion)}</span> باز می‌شود و بررسی نسخه
+                در پس‌زمینه تکرار می‌شود.
               </Notice>
             )}
 

@@ -3,6 +3,7 @@
 ## ۱. نصب خودکار (پیشنهادی)
 
 ### پیش‌نیازها
+
 - سرور تازه با Ubuntu 22.04+ / Debian 12+ / Rocky|Alma 9+
 - حداقل **۱ هسته / ۲ گیگ رم / ۱۵ گیگ دیسک** (چون روی سرور بیلد نمی‌شود)
 - دسترسی `root` یا `sudo`
@@ -17,12 +18,12 @@ curl -fsSL https://raw.githubusercontent.com/SRNetWork-ai/SR-Connect/main/deploy
 
 اسکریپت به‌صورت تعاملی این‌ها را می‌پرسد:
 
-| پرسش | متغیر | نمونه |
-|---|---|---|
-| دامنه‌ای که به IP این سرور اشاره می‌کند | `SR_DOMAIN` | `chat.example.com` |
-| ایمیل برای گواهی TLS | `SR_ACME_EMAIL` | `you@example.com` |
-| نام کاربری مدیر | `ADMIN_USERNAME` | `admin` |
-| گذرواژهٔ مدیر | `ADMIN_PASSWORD` | حداقل ۱۰ نویسه — خالی بگذاری خودش می‌سازد |
+| پرسش                                    | متغیر            | نمونه                                     |
+| --------------------------------------- | ---------------- | ----------------------------------------- |
+| دامنه‌ای که به IP این سرور اشاره می‌کند | `SR_DOMAIN`      | `chat.example.com`                        |
+| ایمیل برای گواهی TLS                    | `SR_ACME_EMAIL`  | `you@example.com`                         |
+| نام کاربری مدیر                         | `ADMIN_USERNAME` | `admin`                                   |
+| گذرواژهٔ مدیر                           | `ADMIN_PASSWORD` | حداقل ۱۰ نویسه — خالی بگذاری خودش می‌سازد |
 
 ### حالت غیرتعاملی
 
@@ -38,16 +39,16 @@ sudo SR_DOMAIN=chat.example.com \
      bash install.sh
 ```
 
-| متغیر | پیش‌فرض | توضیح |
-|---|---|---|
-| `SR_DOMAIN` | — | اجباری |
-| `SR_ACME_EMAIL` | — | اجباری |
-| `ADMIN_USERNAME` | `admin` | |
-| `ADMIN_PASSWORD` | ساخته می‌شود | حداقل ۱۰ نویسه |
-| `NONINTERACTIVE` | `0` | `1` = بدون پرسش |
-| `SR_MODE` | `auto` | `pull` = فقط ایمیج آماده · `build` = بیلد روی سرور |
-| `SR_VERSION` | `1.0.0` | |
-| `INSTALL_DIR` | `/opt/sr-connect` | |
+| متغیر            | پیش‌فرض           | توضیح                                              |
+| ---------------- | ----------------- | -------------------------------------------------- |
+| `SR_DOMAIN`      | —                 | اجباری                                             |
+| `SR_ACME_EMAIL`  | —                 | اجباری                                             |
+| `ADMIN_USERNAME` | `admin`           |                                                    |
+| `ADMIN_PASSWORD` | ساخته می‌شود      | حداقل ۱۰ نویسه                                     |
+| `NONINTERACTIVE` | `0`               | `1` = بدون پرسش                                    |
+| `SR_MODE`        | `auto`            | `pull` = فقط ایمیج آماده · `build` = بیلد روی سرور |
+| `SR_VERSION`     | `1.0.0`           |                                                    |
+| `INSTALL_DIR`    | `/opt/sr-connect` |                                                    |
 
 ### بعد از نصب
 
@@ -70,11 +71,11 @@ sudo SR_DOMAIN=chat.example.com \
 
 ## ۱.۵ ایمیج آماده در برابر بیلد محلی
 
-| حالت | رم لازم | زمان | کِی؟ |
-|---|---|---|---|
-| `SR_MODE=pull` | ~۱ گیگ | ۲ تا ۳ دقیقه | پیش‌فرض عملی برای سرورهای کوچک |
-| `SR_MODE=build` | ۴ گیگ (یا ۲ گیگ + swap) | ۸ تا ۱۵ دقیقه | وقتی کد را تغییر داده‌ای |
-| `SR_MODE=auto` | — | — | پیش‌فرض: اول pull، اگر نشد build |
+| حالت            | رم لازم                 | زمان          | کِی؟                             |
+| --------------- | ----------------------- | ------------- | -------------------------------- |
+| `SR_MODE=pull`  | ~۱ گیگ                  | ۲ تا ۳ دقیقه  | پیش‌فرض عملی برای سرورهای کوچک   |
+| `SR_MODE=build` | ۴ گیگ (یا ۲ گیگ + swap) | ۸ تا ۱۵ دقیقه | وقتی کد را تغییر داده‌ای         |
+| `SR_MODE=auto`  | —                       | —             | پیش‌فرض: اول pull، اگر نشد build |
 
 ایمیج‌های آماده اینجا منتشر می‌شوند و با هر push به `main` تازه می‌شوند:
 
@@ -154,31 +155,38 @@ LiveKit و coturn را جداگانه از مستندات خودشان نصب ک
 ```bash
 cd /opt/sr-connect/deploy && docker compose logs caddy --tail=100
 ```
+
 - مطمئن شو رکورد `A` دامنه دقیقاً به IP سرور اشاره می‌کند: `dig +short chat.example.com`
 - پورت ۸۰ نباید توسط nginx/apache گرفته شده باشد: `sudo ss -lntp | grep :80`
 - Let's Encrypt محدودیت نرخ دارد؛ در تست از `--staging` استفاده کن.
+
 </details>
 
 <details>
 <summary><b>صدا وصل می‌شود ولی کسی صدای کسی را نمی‌شنود</b></summary>
 
 تقریباً همیشه مشکل UDP است.
+
 ```bash
 sudo ufw status | grep 50000        # باید 50000:50400/udp باز باشد
 docker compose logs livekit --tail=80
 ```
+
 - در VPS هایی مثل Hetzner/OVH فایروال پنل هم باید باز شود، نه فقط ufw.
 - `LIVEKIT_NODE_IP` در `deploy/.env` باید IP **عمومی** سرور باشد.
 - اگر شبکه‌ی کاربر UDP را می‌بندد، coturn روی `443/tcp` بازگشت (fallback) می‌دهد.
+
 </details>
 
 <details>
 <summary><b>WebSocket وصل نمی‌شود (کد ۴۴۰۱)</b></summary>
 
 یعنی تیکت نامعتبر یا منقضی است.
+
 - ساعت سرور را همگام کن: `timedatectl set-ntp true`
 - `GATEWAY_SHARED_SECRET` باید در web و gateway یکی باشد.
 - `docker compose logs gateway --tail=60`
+
 </details>
 
 <details>
@@ -188,6 +196,7 @@ docker compose logs livekit --tail=80
 docker compose logs postgres --tail=80
 docker compose exec postgres pg_isready -U srconnect
 ```
+
 اگر `POSTGRES_PASSWORD` را بعد از اولین اجرا عوض کرده‌ای، volume قدیمی رمز قبلی را دارد.
 یا رمز را برگردان یا volume را پاک کن (⚠️ دیتا می‌رود).
 </details>
@@ -215,7 +224,8 @@ cd /opt/sr-connect/deploy && docker compose build --pull web
 <summary><b>حافظه کم می‌آورد هنگام بیلد</b></summary>
 
 نصب‌کننده خودش swap می‌سازد، ولی اگر دستی نصب می‌کنی:
-```bash
+
+````bash
 sudo fallocate -l 4G /swapfile && sudo chmod 600 /swapfile
 sudo mkswap /swapfile && sudo swapon /swapfile
 echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
@@ -230,8 +240,9 @@ free -h      # باید Swap را ببینی
 ```bash
 cd /opt/sr-connect/deploy
 docker compose build --build-arg NODE_HEAP_MB=1024 web
-```
-```
+````
+
+````
 </details>
 
 ---
@@ -242,7 +253,7 @@ docker compose build --build-arg NODE_HEAP_MB=1024 web
 sudo bash /opt/sr-connect/deploy/scripts/update.sh   # بکاپ → pull → build → migrate → health
 sudo bash /opt/sr-connect/deploy/scripts/backup.sh   # بکاپ دستی (۱۴ نسخهٔ آخر نگه داشته می‌شود)
 sudo bash /opt/sr-connect/deploy/scripts/restore.sh  # بازیابی
-```
+````
 
 `update.sh` اگر health check بعد از آپدیت رد شود، **خودکار به commit قبلی برمی‌گردد**.
 

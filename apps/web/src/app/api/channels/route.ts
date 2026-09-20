@@ -34,7 +34,8 @@ export function POST(req: Request) {
     if (name.length < 2) throw new HttpError(400, "نام کانال حداقل ۲ نویسه باشد");
 
     const type = body.type ?? "text";
-    if (!["text", "voice", "stage"].includes(type)) throw new HttpError(400, "نوع کانال نامعتبر است");
+    if (!["text", "voice", "stage"].includes(type))
+      throw new HttpError(400, "نوع کانال نامعتبر است");
 
     const channel = await one<Channel>(
       `insert into channels (name, type, category_id, topic, user_limit)

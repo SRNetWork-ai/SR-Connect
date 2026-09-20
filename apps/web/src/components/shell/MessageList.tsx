@@ -1,132 +1,184 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
-import { Loader2 } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { ArrowDown, Hash, Loader2, Sparkles } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChatMessage } from "@sr/protocol";
+import { MessageItem } from "@/components/shell/MessageItem";
+import { MessageSkeleton } from "@/components/ui/Skeleton";
+import { cn } from "@/lib/cn";
+import { fa } from "@/lib/fmt";
 import { useApp } from "@/store/use-app";
 
-/** پیام‌های پشت‌سرهم از یک نفر در بازه‌ی ۵ دقیقه، یک گروه می‌شوند. */
-function groupMessages(messages: ChatMessage[]) {
-  const groups: { author: ChatMessage["author"]; createdAt: string; items: ChatMessage[] }[] = [];
-  for (const m of messages) {
-    const last = groups[groups.length - 1];
-    const sameAuthor = last && last.author.id === m.author.id;
-    const closeInTime =
-      last && new Date(m.createdAt).getTime() - new Date(last.createdAt).getTime() < 5 * 60_000;
-    if (sameAuthor && closeInTime) last.items.push(m);
-    else groups.push({ author: m.author, createdAt: m.createdAt, items: [m] });
-  }
-  return groups;
-}
-
-const time = new Intl.DateTimeFormat("fa-IR", { hour: "2-digit", minute: "2-digit" });
 const day = new Intl.DateTimeFormat("fa-IR", { dateStyle: "long" });
+
+/** پیام‌های پشت‌سرهم از یک نفر در بازه‌ی ۵ دقیقه، فشرده نمایش داده می‌شوند. */
+function isCompact(prev: ChatMessage | undefined, m: ChatMessage): boolean {
+  if (!prev || prev.author.id !== m.author.id) return false;
+  if (m.replyPreview) return false;
+  if (prev.system !== m.system) return false;
+  return new Date(m.createdAt).getTime() - new Date(prev.createdAt).getTime() < 5 * 60_000;
+}
 
 export function MessageList() {
   const channelId = useApp((s) => s.activeChannelId);
   const messages = useApp((s) => (s.activeChannelId ? (s.messages[s.activeChannelId] ?? []) : []));
-  const hasMore = useApp((s) => (s.activeChannelId ? Boolean(s.hasMore[s.activeChannelId]) : false));
+  const hasMore = useApp((s) =>
+    s.activeChannelId ? Boolean(s.hasMore[s.activeChannelId]) : false,
+  );
   const loading = useApp((s) =>
     s.activeChannelId ? Boolean(s.loadingHistory[s.activeChannelId]) : false,
   );
   const loadHistory = useApp((s) => s.loadHistory);
+  const markRead = useApp((s) => s.markRead);
   const channel = useApp((s) => s.channels.find((c) => c.id === s.activeChannelId));
+  const members = useApp((s) => s.members);
+
+  const names = useMemo(
+    () => Object.fromEntries(members.map((m) => [m.id, m.displayName])),
+    [members],
+  );
 
   const scroller = useRef<HTMLDivElement>(null);
   const atBottom = useRef(true);
+  const [showJump, setShowJump] = useState(false);
 
-  const groups = useMemo(() => groupMessages(messages), [messages]);
+  const stickToBottom = useCallback((behavior: ScrollBehavior = "auto") => {
+    const el = scroller.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior });
+  }, []);
 
   useEffect(() => {
-    // فقط اگر کاربر ته لیست است، خودکار اسکرول می‌کنیم.
-    if (atBottom.current) scroller.current?.scrollTo({ top: scroller.current.scrollHeight });
-  }, [messages.length]);
+    if (atBottom.current) stickToBottom();
+  }, [messages.length, stickToBottom]);
 
   useEffect(() => {
     atBottom.current = true;
-    scroller.current?.scrollTo({ top: scroller.current.scrollHeight });
-  }, [channelId]);
+    setShowJump(false);
+    stickToBottom();
+  }, [channelId, stickToBottom]);
+
+  const firstLoad = loading && messages.length === 0;
 
   return (
-    <div
-      ref={scroller}
-      onScroll={(e) => {
-        const el = e.currentTarget;
-        atBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-        if (el.scrollTop < 120 && hasMore && !loading && channelId) {
-          void loadHistory(channelId, { older: true });
-        }
-      }}
-      className="scroll-y flex-1 px-4 py-4"
-    >
-      {hasMore && (
-        <div className="flex justify-center pb-3">
-          <button
-            onClick={() => channelId && void loadHistory(channelId, { older: true })}
-            className="flex items-center gap-1.5 rounded-pill bg-card px-3 py-1 text-xs text-t3 hover:bg-hover"
+    <div className="relative min-h-0 flex-1">
+      <div
+        ref={scroller}
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          const bottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+          atBottom.current = bottom < 80;
+          setShowJump(bottom > 320);
+          if (atBottom.current && channelId) markRead(channelId);
+          if (el.scrollTop < 140 && hasMore && !loading && channelId) {
+            void loadHistory(channelId, { older: true });
+          }
+        }}
+        className="scroll-y absolute inset-0 pb-3"
+      >
+        {firstLoad && (
+          <div className="space-y-1 pt-4">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <MessageSkeleton key={i} />
+            ))}
+          </div>
+        )}
+
+        {hasMore && !firstLoad && (
+          <div className="flex justify-center py-3">
+            <button
+              onClick={() => channelId && void loadHistory(channelId, { older: true })}
+              className="flex items-center gap-1.5 rounded-pill bg-card px-3 py-1 text-xs text-t3 transition-colors hover:bg-hover"
+            >
+              {loading && <Loader2 className="size-3 animate-spin" />}
+              پیام‌های قدیمی‌تر
+            </button>
+          </div>
+        )}
+
+        {/* سرآغاز کانال */}
+        {!hasMore && !firstLoad && channel && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.34, ease: [0.22, 1, 0.36, 1] }}
+            className="px-4 pt-8 pb-5"
           >
-            {loading && <Loader2 className="size-3 animate-spin" />}
-            پیام‌های قدیمی‌تر
-          </button>
-        </div>
-      )}
-
-      {messages.length === 0 && !loading && (
-        <div className="grid h-full place-items-center text-center">
-          <div>
-            <p className="text-lg font-bold text-t2">اینجا خالی است</p>
+            <span className="grid size-[68px] place-items-center rounded-full bg-gradient-to-br from-brand to-accent shadow-pop">
+              <Hash className="size-9 text-white" />
+            </span>
+            <h2 className="mt-4 text-2xl font-bold text-t1">به {channel.name} خوش آمدی</h2>
             <p className="mt-1 text-sm text-t4">
-              {channel ? `اولین پیام کانال ${channel.name} را بنویس.` : "یک کانال انتخاب کن."}
+              {channel.topic ?? `این ابتدای کانال ${channel.name} است.`}
             </p>
-          </div>
-        </div>
-      )}
+            <span className="mt-4 block h-px bg-gradient-to-l from-transparent via-divider to-transparent" />
+          </motion.div>
+        )}
 
-      {groups.map((group, gi) => {
-        const prev = groups[gi - 1];
-        const newDay =
-          !prev ||
-          new Date(prev.createdAt).toDateString() !== new Date(group.createdAt).toDateString();
-        return (
-          <div key={group.items[0]!.id}>
-            {newDay && (
-              <div className="my-4 flex items-center gap-3">
-                <span className="h-px flex-1 bg-divider" />
-                <span className="text-2xs text-t4">{day.format(new Date(group.createdAt))}</span>
-                <span className="h-px flex-1 bg-divider" />
-              </div>
-            )}
-            <div className="group flex gap-3 py-1.5 hover:bg-[#2e3035]/40">
-              <span
-                className="mt-0.5 grid size-10 shrink-0 place-items-center rounded-full text-sm font-bold text-white"
-                style={{ background: group.author.avatarColor }}
-              >
-                {group.author.displayName[0]}
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-baseline gap-2">
-                  <span className="text-base font-semibold text-t1">
-                    {group.author.displayName}
-                  </span>
-                  <span className="text-2xs text-t4">
-                    {time.format(new Date(group.createdAt))}
-                  </span>
-                </div>
-                {group.items.map((m) => (
-                  <p
-                    key={m.id}
-                    className={`text-base break-words whitespace-pre-wrap ${
-                      m.system ? "text-t4 italic" : "text-t2"
-                    } ${m.id.startsWith("tmp-") ? "opacity-60" : ""}`}
-                  >
-                    {m.content}
-                  </p>
-                ))}
-              </div>
-            </div>
+        {messages.length === 0 && !loading && (
+          <div className="grid h-full place-items-center text-center">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ type: "spring", stiffness: 300, damping: 26 }}
+            >
+              <Sparkles className="mx-auto size-7 text-brand" />
+              <p className="mt-2 text-lg font-bold text-t2">اینجا خالی است</p>
+              <p className="mt-1 text-sm text-t4">
+                {channel ? `اولین پیام کانال ${channel.name} را بنویس.` : "یک کانال انتخاب کن."}
+              </p>
+            </motion.div>
           </div>
-        );
-      })}
+        )}
+
+        <AnimatePresence initial={false}>
+          {messages.map((m, i) => {
+            const prev = messages[i - 1];
+            const newDay =
+              !prev ||
+              new Date(prev.createdAt).toDateString() !== new Date(m.createdAt).toDateString();
+            return (
+              <div key={m.id}>
+                {newDay && (
+                  <div className="my-4 flex items-center gap-3 px-4">
+                    <span className="h-px flex-1 bg-divider" />
+                    <span className="rounded-pill border border-divider px-2 py-0.5 text-2xs text-t4">
+                      {day.format(new Date(m.createdAt))}
+                    </span>
+                    <span className="h-px flex-1 bg-divider" />
+                  </div>
+                )}
+                <MessageItem message={m} compact={!newDay && isCompact(prev, m)} names={names} />
+              </div>
+            );
+          })}
+        </AnimatePresence>
+      </div>
+
+      {/* برگشت به آخرین پیام */}
+      <AnimatePresence>
+        {showJump && (
+          <motion.button
+            initial={{ opacity: 0, y: 10, scale: 0.94 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 8, scale: 0.94 }}
+            transition={{ type: "spring", stiffness: 420, damping: 30 }}
+            onClick={() => {
+              stickToBottom("smooth");
+              atBottom.current = true;
+              if (channelId) markRead(channelId);
+            }}
+            className={cn(
+              "surface absolute bottom-3 end-4 z-10 flex items-center gap-1.5 rounded-pill px-3 py-1.5 text-xs text-t2",
+            )}
+          >
+            <ArrowDown className="size-3.5" />
+            <span className="tnum">
+              جدیدترین‌ها {messages.length ? `· ${fa(messages.length)}` : ""}
+            </span>
+          </motion.button>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

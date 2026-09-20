@@ -11,11 +11,13 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const isForm = typeof FormData !== "undefined" && init?.body instanceof FormData;
   const res = await fetch(serverEndpoint(path), {
     ...init,
     credentials: "include",
     headers: {
-      ...(init?.body ? { "content-type": "application/json" } : {}),
+      // FormData باید boundary خودش را بسازد، پس content-type دستی نمی‌گذاریم.
+      ...(init?.body && !isForm ? { "content-type": "application/json" } : {}),
       ...(init?.headers ?? {}),
     },
     cache: "no-store",
@@ -38,4 +40,7 @@ export const api = {
       method: "PATCH",
       body: body === undefined ? undefined : JSON.stringify(body),
     }),
+  del: <T>(path: string) => request<T>(path, { method: "DELETE" }),
+  /** آپلود چندفایلی؛ برای پیوست پیام و آواتار. */
+  upload: <T>(path: string, form: FormData) => request<T>(path, { method: "POST", body: form }),
 };

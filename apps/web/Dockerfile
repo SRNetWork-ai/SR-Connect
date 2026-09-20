@@ -5,7 +5,7 @@ WORKDIR /repo
 
 # مقادیر NEXT_PUBLIC_* باید هنگام بیلد موجود باشند (داخل باندل می‌روند).
 ARG NEXT_PUBLIC_APP_VERSION=1.0.0
-ARG NEXT_PUBLIC_API_VERSION=3
+ARG NEXT_PUBLIC_API_VERSION=4
 ARG NEXT_PUBLIC_UPDATE_PUBKEY=""
 ARG NEXT_PUBLIC_UPDATE_CHANNEL=stable
 ARG NEXT_PUBLIC_GATEWAY_URL=""
@@ -55,8 +55,8 @@ COPY --from=build --chown=sr:sr /repo/apps/web/public           ./apps/web/publi
 COPY --from=build --chown=sr:sr /repo/apps/web/scripts                ./apps/web/scripts
 COPY --from=build --chown=sr:sr /repo/apps/web/src/lib/db/migrations  ./apps/web/src/lib/db/migrations
 
-# محل نگهداری بسته‌های آپدیت (به‌صورت volume از بیرون mount می‌شود).
-RUN mkdir -p /srv/releases && chown -R sr:sr /srv/releases
+# محل نگهداری بسته‌های آپدیت و پیوست‌های کاربران (هر دو از بیرون mount می‌شوند).
+RUN mkdir -p /srv/releases /srv/uploads && chown -R sr:sr /srv/releases /srv/uploads
 
 USER sr
 EXPOSE 3000

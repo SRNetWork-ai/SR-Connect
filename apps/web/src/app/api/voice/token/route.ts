@@ -30,13 +30,16 @@ export function POST(req: Request) {
     if (channel.type === "text") throw new HttpError(400, "این کانال صوتی نیست");
 
     const mask = await channelPermissions(user, channel.id);
-    if (!has(mask, "CONNECT_VOICE")) throw new HttpError(403, "اجازه‌ی اتصال به این کانال را نداری");
+    if (!has(mask, "CONNECT_VOICE"))
+      throw new HttpError(403, "اجازه‌ی اتصال به این کانال را نداری");
 
     // در استیج فقط کسی که اجازه‌ی مدیریت دارد می‌تواند صحبت کند.
     const canSpeak =
       channel.type === "stage"
         ? has(mask, "SPEAK") && has(mask, "MUTE_MEMBERS")
         : has(mask, "SPEAK");
+
+    const canShare = canSpeak && has(mask, "SCREEN_SHARE");
 
     const token = createVoiceToken({
       identity: user.id,
@@ -51,6 +54,7 @@ export function POST(req: Request) {
       url: serverEnv.livekit.publicUrl,
       room: `channel:${channel.id}`,
       canSpeak,
+      canShare,
       channel: { id: channel.id, name: channel.name, userLimit: channel.user_limit },
     });
   });

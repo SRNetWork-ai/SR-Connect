@@ -58,7 +58,11 @@ export function PATCH(req: Request) {
       `insert into audit_log (actor_id, action, target, meta) values ($1, 'release.update', $2, $3)`,
       [actor.id, release.version, JSON.stringify(body)],
     );
-    await notify({ t: "release_published", version: release.version, mandatory: release.mandatory });
+    await notify({
+      t: "release_published",
+      version: release.version,
+      mandatory: release.mandatory,
+    });
 
     return NextResponse.json({ release });
   });

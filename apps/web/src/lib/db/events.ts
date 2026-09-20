@@ -7,7 +7,9 @@ import { q } from "@/lib/db/pool";
  */
 export type DbEvent =
   | { t: "message_create"; channelId: string; messageId: string }
+  | { t: "message_update"; channelId: string; messageId: string }
   | { t: "message_delete"; channelId: string; messageId: string }
+  | { t: "reaction_update"; channelId: string; messageId: string }
   | { t: "channels_changed" }
   | { t: "release_published"; version: string; mandatory: boolean };
 

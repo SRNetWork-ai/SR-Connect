@@ -3,6 +3,7 @@ import type { ChatMessage, PresenceStatus, ServerMessage, VoiceParticipant } fro
 import { CLOSE_CODES, LIMITS } from "@sr/protocol";
 import type { GatewayUser } from "./auth.js";
 import { markPresence } from "./auth.js";
+import { personalize, type ReactionUsers } from "./messages.js";
 
 export interface Conn {
   id: string;
@@ -93,8 +94,37 @@ export class Hub {
     }
   }
 
-  messageCreate(message: ChatMessage) {
-    this.broadcastChannel(message.channelId, { t: "message_create", message });
+  /** پیام تازه — ری‌اکشن‌ها برای هر بیننده جداگانه شخصی‌سازی می‌شوند. */
+  messageCreate(message: ChatMessage, reactions: ReactionUsers[] = []) {
+    for (const conn of this.conns.values()) {
+      if (!conn.channels.has(message.channelId)) continue;
+      this.send(conn, {
+        t: "message_create",
+        message: { ...message, reactions: personalize(reactions, conn.user.id) },
+      });
+    }
+  }
+
+  messageUpdate(message: ChatMessage, reactions: ReactionUsers[] = []) {
+    for (const conn of this.conns.values()) {
+      if (!conn.channels.has(message.channelId)) continue;
+      this.send(conn, {
+        t: "message_update",
+        message: { ...message, reactions: personalize(reactions, conn.user.id) },
+      });
+    }
+  }
+
+  reactionUpdate(channelId: string, messageId: string, reactions: ReactionUsers[]) {
+    for (const conn of this.conns.values()) {
+      if (!conn.channels.has(channelId)) continue;
+      this.send(conn, {
+        t: "reaction_update",
+        channelId,
+        messageId,
+        reactions: personalize(reactions, conn.user.id),
+      });
+    }
   }
 
   messageDelete(channelId: string, messageId: string) {

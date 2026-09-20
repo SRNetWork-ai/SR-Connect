@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# بکاپ کامل: دیتابیس + .env + کلید امضا + بسته‌های ریلیز.
+# بکاپ کامل: دیتابیس + .env + کلید امضا + بسته‌های ریلیز + پیوست‌های کاربران.
 # کرون پیشنهادی:  0 3 * * *  /opt/sr-connect/deploy/scripts/backup.sh --quiet
 set -Eeuo pipefail
 
@@ -24,6 +24,11 @@ log "→ پیکربندی و کلیدها"
 cp .env "$TMP/env" 2>/dev/null || true
 [ -d keys ] && cp -r keys "$TMP/keys"
 [ -d releases ] && cp -r releases "$TMP/releases"
+# پیوست‌ها می‌توانند بزرگ باشند؛ با SKIP_UPLOADS=1 از بکاپ کنار گذاشته می‌شوند.
+if [ "${SKIP_UPLOADS:-0}" != "1" ] && [ -d uploads ]; then
+  log "→ پیوست‌ها ($(du -sh uploads 2>/dev/null | cut -f1))"
+  cp -r uploads "$TMP/uploads"
+fi
 git -C "$INSTALL_DIR" rev-parse HEAD > "$TMP/commit.txt" 2>/dev/null || true
 
 tar -czf "$OUT" -C "$TMP" .

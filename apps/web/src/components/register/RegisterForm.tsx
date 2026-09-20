@@ -11,9 +11,10 @@ import { api, ApiError } from "@/lib/api";
 
 export function RegisterForm() {
   const router = useRouter();
-  const [features, setFeatures] = useState<{ registration: boolean; requireInvite: boolean } | null>(
-    null,
-  );
+  const [features, setFeatures] = useState<{
+    registration: boolean;
+    requireInvite: boolean;
+  } | null>(null);
   const [form, setForm] = useState({
     username: "",
     displayName: "",

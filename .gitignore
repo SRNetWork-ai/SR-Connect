@@ -16,3 +16,6 @@ dev-keys/
 *.log
 .DS_Store
 apps/web/public/fonts/
+deploy/uploads/
+playwright-report/
+test-results/

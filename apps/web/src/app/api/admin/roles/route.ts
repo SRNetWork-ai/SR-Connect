@@ -66,11 +66,10 @@ export function PATCH(req: Request) {
     );
     if (!role) throw new HttpError(404, "نقش پیدا نشد");
 
-    await q(`insert into audit_log (actor_id, action, target, meta) values ($1, 'role.update', $2, $3)`, [
-      actor.id,
-      body.id,
-      JSON.stringify(body),
-    ]);
+    await q(
+      `insert into audit_log (actor_id, action, target, meta) values ($1, 'role.update', $2, $3)`,
+      [actor.id, body.id, JSON.stringify(body)],
+    );
     return NextResponse.json({ role });
   });
 }

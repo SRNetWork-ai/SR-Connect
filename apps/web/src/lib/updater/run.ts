@@ -86,7 +86,14 @@ export async function runUpdateFlow(opts: RunOptions): Promise<FlowState> {
     opts.onState({ phase, steps: s, decision, manifest, error, canEnter: false }),
   );
   const push = () =>
-    opts.onState({ phase, steps: steps.snapshot(), decision, manifest, error, canEnter: phase === "ready" });
+    opts.onState({
+      phase,
+      steps: steps.snapshot(),
+      decision,
+      manifest,
+      error,
+      canEnter: phase === "ready",
+    });
 
   const pace = opts.theatrical ? 520 : MIN_STEP_MS;
 
@@ -181,7 +188,14 @@ export async function runUpdateFlow(opts: RunOptions): Promise<FlowState> {
     phase = blocksEntry(d) ? "blocked" : "ready";
     if (phase === "ready") markBootHealthy();
     push();
-    return { phase, steps: steps.snapshot(), decision, manifest, error, canEnter: phase === "ready" };
+    return {
+      phase,
+      steps: steps.snapshot(),
+      decision,
+      manifest,
+      error,
+      canEnter: phase === "ready",
+    };
   }
   await sleep(pace / 2);
 
@@ -196,7 +210,14 @@ export async function runUpdateFlow(opts: RunOptions): Promise<FlowState> {
     phase = blocksEntry(d) ? "blocked" : "ready";
     if (phase === "ready") markBootHealthy();
     push();
-    return { phase, steps: steps.snapshot(), decision, manifest, error, canEnter: phase === "ready" };
+    return {
+      phase,
+      steps: steps.snapshot(),
+      decision,
+      manifest,
+      error,
+      canEnter: phase === "ready",
+    };
   }
 
   if (!check.signature.ok && check.signature.reason === "bad-signature") {
@@ -206,7 +227,14 @@ export async function runUpdateFlow(opts: RunOptions): Promise<FlowState> {
     phase = blocksEntry(d) ? "blocked" : "ready";
     if (phase === "ready") markBootHealthy();
     push();
-    return { phase, steps: steps.snapshot(), decision, manifest, error, canEnter: phase === "ready" };
+    return {
+      phase,
+      steps: steps.snapshot(),
+      decision,
+      manifest,
+      error,
+      canEnter: phase === "ready",
+    };
   }
 
   steps.done(
@@ -228,7 +256,14 @@ export async function runUpdateFlow(opts: RunOptions): Promise<FlowState> {
     phase = blocksEntry(d) ? "blocked" : "ready";
     if (phase === "ready") markBootHealthy();
     push();
-    return { phase, steps: steps.snapshot(), decision, manifest, error, canEnter: phase === "ready" };
+    return {
+      phase,
+      steps: steps.snapshot(),
+      decision,
+      manifest,
+      error,
+      canEnter: phase === "ready",
+    };
   }
   await sleep(pace / 2);
 

@@ -21,8 +21,17 @@ const nextConfig: NextConfig = {
     return [
       {
         // نسخه و بسته‌ها هیچ‌وقت کش نمی‌شوند؛ وگرنه آپدیت گیر می‌کند.
-        source: "/api/:path*",
+        // /api/files استثناست: محتوایش تغییرناپذیر است و باید کش شود.
+        source: "/api/:path((?!files/).*)",
         headers: [{ key: "Cache-Control", value: "no-store, max-age=0" }],
+      },
+      {
+        // فایل‌های آپلودی هیچ‌وقت نباید به‌عنوان صفحه اجرا شوند.
+        source: "/api/files/:path*",
+        headers: [
+          { key: "Content-Security-Policy", value: "default-src 'none'; sandbox" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+        ],
       },
       {
         source: "/(.*)",
@@ -30,6 +39,8 @@ const nextConfig: NextConfig = {
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+          { key: "X-DNS-Prefetch-Control", value: "off" },
           {
             key: "Permissions-Policy",
             value: "microphone=(self), camera=(self), display-capture=(self)",

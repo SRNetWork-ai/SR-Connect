@@ -44,7 +44,9 @@ export function QrPanel() {
         <svg viewBox={`0 0 ${size} ${size}`} className="size-[150px]" shapeRendering="crispEdges">
           {grid.flatMap((row, y) =>
             row.map((on, x) =>
-              on ? <rect key={`${x}-${y}`} x={x} y={y} width="1" height="1" fill="#111214" /> : null,
+              on ? (
+                <rect key={`${x}-${y}`} x={x} y={y} width="1" height="1" fill="#111214" />
+              ) : null,
             ),
           )}
         </svg>

@@ -28,4 +28,6 @@ export const serverEnv = {
     publicKey: process.env.UPDATE_PUBKEY ?? process.env.NEXT_PUBLIC_UPDATE_PUBKEY ?? "",
   },
   voiceCapacity: Number(process.env.VOICE_CAPACITY ?? 20),
+  uploadsDir: process.env.UPLOADS_DIR ?? "/srv/uploads",
+  maxUploadBytes: Number(process.env.MAX_UPLOAD_BYTES ?? 25 * 1024 * 1024),
 };

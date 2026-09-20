@@ -61,6 +61,11 @@ export const DEFAULT_MEMBER_PERMISSIONS =
   PERMISSION_BITS.VIDEO |
   PERMISSION_BITS.SCREEN_SHARE;
 
+/** ساخت ماسک از روی نام دسترسی‌ها — برای تست و seed. */
+export function maskOf(...names: PermissionName[]): number {
+  return names.reduce((acc, n) => acc | PERMISSION_BITS[n], 0);
+}
+
 export function has(mask: number, permission: PermissionName): boolean {
   if (mask & PERMISSION_BITS.ADMINISTRATOR) return true;
   return (mask & PERMISSION_BITS[permission]) !== 0;

@@ -28,6 +28,13 @@ export const metadata: Metadata = {
   manifest: "/manifest.webmanifest",
 };
 
+/**
+ * CSP با nonce فقط روی رندر داینامیک کار می‌کند: Next باید هر بار
+ * nonce درخواست را روی تگ‌های script بگذارد. صفحه‌های این اپ هم عملاً
+ * داینامیک‌اند (همه‌چیز بعد از ورود از API می‌آید)، پس هزینه‌ای ندارد.
+ */
+export const dynamic = "force-dynamic";
+
 export const viewport: Viewport = {
   themeColor: "#1e1f22",
   colorScheme: "dark",

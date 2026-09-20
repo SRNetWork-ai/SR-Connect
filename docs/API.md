@@ -1,239 +1,366 @@
 # مرجع API
 
 پایه: `https://<your-domain>/api`
-همهٔ مسیرها JSON می‌گیرند و JSON برمی‌گردانند.
-احراز هویت با کوکی نشست (`sr_session`) انجام می‌شود.
+همهٔ مسیرها JSON می‌گیرند و JSON برمی‌گردانند (به‌جز آپلود که `multipart/form-data` است).
+احراز هویت با کوکی نشست `sr_session` انجام می‌شود؛ کلاینت نیتیو می‌تواند
+`Authorization: Bearer <token>` بفرستد.
 
-فرمت خطا:
+فرمت خطا همیشه یکسان است:
 
 ```json
-{ "error": "کد_خطا", "message": "توضیح قابل‌خواندن" }
+{ "error": "توضیح قابل‌خواندن برای کاربر" }
 ```
+
+| کد    | معنی                    |
+| ----- | ----------------------- |
+| `400` | ورودی نامعتبر           |
+| `401` | وارد نشده‌ای            |
+| `403` | دسترسی لازم را نداری    |
+| `404` | پیدا نشد                |
+| `410` | حذف شده                 |
+| `413` | فایل بزرگ‌تر از حد مجاز |
+| `415` | نوع فایل مجاز نیست      |
+| `429` | rate limit              |
 
 ---
 
 ## سلامت و نسخه
 
 ### `GET /api/health`
-بدون احراز هویت. برای health check و لودبالانسر.
 
-```json
-{ "ok": true, "db": "up", "version": "1.0.0", "uptime": 132840 }
-```
+بدون احراز هویت. برای health check داکر و اسکریپت `health.sh`.
 
 ### `GET /api/version?platform=win&channel=stable`
-manifest آخرین نسخهٔ منتشرشدهٔ کلاینت.
 
-```json
-{
-  "version": "1.1.0",
-  "url": "/api/artifact/SR-Connect-1.1.0-win-x64.exe",
-  "digest": "9f2c…",
-  "signature": "base64…",
-  "notes": "رفع باگ قطع صدا",
-  "publishedAt": "2025-01-14T10:00:00.000Z",
-  "mandatory": false
-}
-```
-
-`platform`: `win` | `mac` | `linux` | `web` — `channel`: `stable` | `beta` | `dev`
+manifest آخرین نسخهٔ منتشرشدهٔ کلاینت (امضاشده با Ed25519).
 
 ### `GET /api/artifact/:name`
-دانلود فایل پکیج. پاسخ استریم می‌شود و از Range پشتیبانی می‌کند.
+
+دانلود بستهٔ آپدیت. استریم می‌شود.
 
 ---
 
 ## احراز هویت
 
 ### `POST /api/auth/register`
+
 ```json
 { "username": "ali", "password": "…", "displayName": "علی", "invite": "ABCD1234" }
 ```
-→ `201` + کوکی نشست. اگر ثبت‌نام عمومی بسته باشد، `invite` اجباری است.
+
+→ `201` + کوکی نشست. اگر `REQUIRE_INVITE=1` باشد، `invite` اجباری است.
+rate limit: ۴ بار در ۵ دقیقه به ازای هر IP.
 
 ### `POST /api/auth/login`
-```json
-{ "username": "ali", "password": "…", "remember": true }
-```
-→ `200` + کوکی نشست (۳۰ روز اگر `remember` باشد، وگرنه session cookie).
 
-### `POST /api/auth/logout`
-نشست فعلی را باطل و کوکی را پاک می‌کند.
-
-### `GET /api/auth/me`
 ```json
-{ "id": "usr_…", "username": "ali", "displayName": "علی",
-  "avatarUrl": null, "roles": ["rol_admin"], "permissions": "524287" }
+{ "identity": "ali", "password": "…" }
 ```
+
+→ `200` + کوکی نشست. `identity` می‌تواند نام کاربری یا ایمیل باشد.
+rate limit: ۸ بار در دقیقه، هم روی IP و هم روی نام کاربری.
+
+### `POST /api/auth/logout` · `GET /api/auth/me`
 
 ---
 
 ## بارگذاری اولیه
 
 ### `GET /api/bootstrap`
-همهٔ چیزی که UI برای اولین رندر لازم دارد، در **یک** درخواست:
 
-```json
+هرچه UI برای اولین رندر لازم دارد، در **یک** درخواست:
+
+```jsonc
 {
-  "user": { … },
-  "server": { "name": "SR-Connect", "iconUrl": null },
-  "categories": [ { "id": "cat_…", "name": "متنی", "position": 0 } ],
+  "user": {
+    "id": "…",
+    "username": "ali",
+    "displayName": "علی",
+    "avatarColor": "#5865F2",
+    "avatarUrl": null,
+    "bio": null,
+    "isAdmin": true,
+    "permissions": 524287,
+    "roles": [],
+  },
+  "categories": [{ "id": "…", "name": "متنی", "position": 0 }],
   "channels": [
-    { "id": "chn_…", "categoryId": "cat_…", "name": "عمومی",
-      "type": "text", "position": 0, "topic": null }
+    {
+      "id": "…",
+      "categoryId": "…",
+      "name": "عمومی",
+      "type": "text",
+      "topic": null,
+      "position": 0,
+      "isPrivate": false,
+      "userLimit": 0,
+      "bitrate": 64000,
+    },
   ],
-  "roles": [ { "id": "rol_…", "name": "ادمین", "color": "#5865F2",
-               "position": 100, "permissions": "524287" } ],
-  "members": [ { "id": "usr_…", "displayName": "علی", "status": "online" } ],
-  "apiVersion": 3,
-  "appVersion": "1.0.0"
+  "members": [{ "id": "…", "displayName": "علی", "status": "online" }],
+  "readState": [{ "channelId": "…", "lastReadAt": "…", "unread": 3, "mentions": 1 }],
+  "stats": { "members": 12, "online": 4, "voiceCapacity": 20, "uptimeSeconds": 1320 },
+  "features": { "voice": true, "registration": true, "requireInvite": false, "uploads": true },
 }
 ```
 
 ---
 
-## کانال‌ها
+## کانال‌ها و پیام‌ها
 
-### `GET /api/channels`
-فهرست کانال‌هایی که کاربر بیت `VIEW_CHANNEL` را روی آن‌ها دارد.
+### `GET /api/channels` · `POST /api/channels`
 
-### `POST /api/channels`
-نیاز به `MANAGE_CHANNELS`.
-```json
-{ "name": "بازی", "type": "voice", "categoryId": "cat_…", "topic": null }
+ساخت کانال نیاز به `MANAGE_CHANNELS` دارد.
+
+### `GET /api/channels/:id/messages?before=<ISO>&limit=50`
+
+صفحه‌بندی keyset روی `created_at`، از قدیم به جدید مرتب برمی‌گردد. `limit` حداکثر ۱۰۰.
+
+```jsonc
+{
+  "messages": [
+    {
+      "id": "…",
+      "channelId": "…",
+      "content": "سلام **دنیا**",
+      "createdAt": "2025-01-14T10:00:00.000Z",
+      "editedAt": null,
+      "system": false,
+      "replyTo": null,
+      "replyPreview": {
+        "id": "…",
+        "authorName": "رضا",
+        "authorColor": "#EB459E",
+        "excerpt": "پیام قبلی…",
+        "deleted": false,
+      },
+      "author": {
+        "id": "…",
+        "username": "ali",
+        "displayName": "علی",
+        "avatarColor": "#5865F2",
+        "avatarUrl": "/api/files/…",
+      },
+      "attachments": [
+        {
+          "id": "…",
+          "filename": "shot.png",
+          "size": 51234,
+          "mime": "image/png",
+          "url": "/api/files/…",
+          "width": 1280,
+          "height": 720,
+        },
+      ],
+      "reactions": [{ "emoji": "👍", "count": 3, "me": true }],
+    },
+  ],
+  "hasMore": true,
+}
 ```
 
-### `GET /api/channels/:id/messages?before=<msgId>&limit=50`
-صفحه‌بندی cursor-based، از جدید به قدیم. `limit` حداکثر ۱۰۰.
-
-```json
-{ "messages": [ { "id": "msg_…", "channelId": "chn_…",
-    "author": { "id": "usr_…", "displayName": "علی" },
-    "content": "سلام", "createdAt": "2025-01-14T10:00:00.000Z",
-    "editedAt": null, "attachments": [] } ],
-  "hasMore": true }
-```
+`me` در ری‌اکشن‌ها همیشه نسبت به کاربرِ درخواست‌دهنده حساب می‌شود.
 
 ### `POST /api/channels/:id/messages`
-نیاز به `SEND_MESSAGES`. حداکثر ۴۰۰۰ کاراکتر.
+
+نیاز به `SEND_MESSAGE`؛ با پیوست، `ATTACH_FILES` هم لازم است.
+
 ```json
-{ "content": "سلام!", "nonce": "c-1736847600000" }
+{ "content": "سلام!", "replyTo": null, "attachmentIds": ["att_…"] }
 ```
-`nonce` برای optimistic UI است و در رویداد `message_create` برگردانده می‌شود.
+
+منشن‌ها به شکل `<@uuid>` داخل متن می‌آیند و سرور جدول `mentions` را پر می‌کند.
+rate limit: ۴۵ پیام در دقیقه.
+
+### `PATCH /api/channels/:id/messages/:messageId`
+
+فقط نویسندهٔ پیام. `{ "content": "متن جدید" }` → پیام با `editedAt` پر برمی‌گردد.
+
+### `DELETE /api/channels/:id/messages/:messageId`
+
+نویسنده، یا هر کسی که `MANAGE_MESSAGES` دارد. حذف نرم است (`deleted_at`)
+و اگر مدیر پیام دیگری را پاک کند، در `audit_log` ثبت می‌شود.
+
+### `POST /api/channels/:id/messages/:messageId/reactions`
+
+`{ "emoji": "👍" }` — نیاز به `ADD_REACTION`. حداکثر ۲۴ ایموجی متمایز روی هر پیام.
+
+### `DELETE /api/channels/:id/messages/:messageId/reactions?emoji=👍`
+
+ری‌اکشن خودِ کاربر را برمی‌دارد. هر دو مسیر لیست تازهٔ `reactions` را برمی‌گردانند.
+
+### `POST /api/channels/:id/read`
+
+کانال را «خوانده» علامت می‌زند و شمارندهٔ منشن را صفر می‌کند.
+همین کار از روی وب‌سوکت هم با پیام `ack_read` ممکن است.
+
+---
+
+## فایل‌ها
+
+### `POST /api/uploads` — `multipart/form-data`
+
+فیلد `files` (یک یا چند بار). پیوست ابتدا بدون پیام ذخیره می‌شود و
+هنگام ارسال پیام با `attachmentIds` به آن وصل می‌گردد.
+
+```json
+{
+  "attachments": [
+    {
+      "id": "att_…",
+      "filename": "shot.png",
+      "size": 51234,
+      "mime": "image/png",
+      "url": "/api/files/…",
+      "width": 1280,
+      "height": 720
+    }
+  ]
+}
+```
+
+سقف پیش‌فرض: ۲۵ مگابایت برای هر فایل، ۱۰ فایل در هر پیام.
+نوع‌های مجاز: تصویر (png/jpeg/webp/gif/avif)، ویدئو (mp4/webm)،
+صدا (mpeg/ogg/wav)، pdf، zip، متن ساده و json. `image/svg+xml` عمداً مجاز نیست.
+
+### `POST /api/uploads?kind=avatar`
+
+فیلد `avatar`، فقط یک تصویر و حداکثر ۴ مگابایت.
+
+### `GET /api/files/:name`
+
+سرو کردن فایل. نیازمند ورود است (فایل‌ها عمومی نیستند)، با
+`Content-Disposition: inline`، `nosniff` و `Content-Security-Policy: default-src 'none'; sandbox`.
+
+---
+
+## پروفایل
+
+### `PATCH /api/users/me`
+
+```json
+{ "displayName": "علی", "bio": "…", "avatarColor": "#5865F2", "avatarAttachmentId": "att_…" }
+```
+
+`avatarAttachmentId: null` آواتار را برمی‌دارد. پاسخ، کاربر کامل با نقش‌ها و ماسک دسترسی است.
 
 ---
 
 ## صدا
 
 ### `POST /api/voice/token`
+
 ```json
 { "channelId": "chn_…" }
 ```
-→
-```json
-{ "token": "eyJhbGciOi…", "url": "wss://chat.example.com/livekit",
-  "room": "chn_…", "identity": "usr_…", "expiresIn": 21600 }
-```
-سرور قبل از صدور، بیت‌های `CONNECT` و `SPEAK` را بررسی می‌کند.
+
+→ `{ "token": "…", "url": "wss://…/rtc", "room": "channel:…",
+     "canSpeak": true, "canShare": true, "channel": { … } }`
+
+`canShare` از بیت `SCREEN_SHARE` می‌آید و تعیین می‌کند دکمهٔ اشتراک صفحه فعال باشد یا نه.
 
 ---
 
 ## بلادرنگ
 
 ### `POST /api/realtime/ticket`
-```json
-{ "ticket": "rt_…", "expiresIn": 60, "url": "wss://chat.example.com/ws" }
-```
-تیکت **یک‌بارمصرف** است و بعد از مصرف در gateway حذف می‌شود.
+
+`{ "ticket": "…", "expiresIn": 60 }` — تیکت **یک‌بارمصرف** و ۶۰ ثانیه‌ای.
+rate limit: ۳۰ بار در دقیقه.
 
 ---
 
-## دعوت‌نامه
+## دعوت‌نامه و مدیریت
 
-### `GET /api/invites` — نیاز به `MANAGE_ROLES`
-### `POST /api/invites`
+### `GET|POST /api/invites` — نیاز به `CREATE_INVITE`
+
+### `GET|POST|PATCH /api/admin/roles` — نیاز به `MANAGE_ROLES`
+
+### `GET /api/admin/audit?limit=60` — نیاز به `MANAGE_ROLES`
+
 ```json
-{ "maxUses": 10, "expiresInHours": 168, "roleId": null }
-```
-→ `{ "code": "ABCD1234", "url": "https://…/register?invite=ABCD1234" }`
-
----
-
-## مدیریت
-
-### `GET /api/admin/roles` — فهرست نقش‌ها
-### `POST /api/admin/roles`
-```json
-{ "name": "مدیر", "color": "#ED4245", "permissions": "3072", "position": 50 }
-```
-### `PATCH /api/admin/roles`
-```json
-{ "id": "rol_…", "permissions": "3584" }
-```
-یا برای انتساب نقش: `{ "userId": "usr_…", "addRoles": ["rol_…"], "removeRoles": [] }`
-
-### `GET /api/admin/releases` — فهرست نسخه‌ها
-### `PATCH /api/admin/releases`
-```json
-{ "id": "rel_…", "published": true, "channel": "stable", "mandatory": false }
+{
+  "entries": [
+    {
+      "id": "12",
+      "action": "message.delete",
+      "actorName": "علی",
+      "target": "msg_…",
+      "meta": { "channelId": "…" },
+      "createdAt": "2025-01-14T10:00:00.000Z"
+    }
+  ]
+}
 ```
 
-همهٔ مسیرهای `/api/admin/*` نیاز به بیت `ADMINISTRATOR` دارند.
+### `GET|PATCH /api/admin/releases` — نیاز به `MANAGE_UPDATES`
 
 ---
 
 ## پروتکل WebSocket
 
 ```
-wss://<your-domain>/ws?ticket=<ticket>
+wss://<your-domain>/ws
 ```
+
+نسخهٔ قرارداد: **`API_VERSION = 4`**. اگر کلاینت عدد دیگری بفرستد، اتصال با
+کد `4002` بسته می‌شود. هر پیام یک آبجکت JSON با کلید `t` است.
 
 ### کلاینت → سرور
 
-| `op` | payload |
-|---|---|
-| `hello` | `{ apiVersion: 3, clientVersion: "1.0.0", platform: "web" }` |
-| `ping` | `{ t: <epoch_ms> }` |
-| `subscribe` | `{ channels: ["chn_…"] }` |
-| `unsubscribe` | `{ channels: ["chn_…"] }` |
-| `typing` | `{ channelId: "chn_…" }` |
-| `presence` | `{ status: "online" \| "idle" \| "dnd" \| "invisible" }` |
+| `t`           | payload                                                                   |
+| ------------- | ------------------------------------------------------------------------- |
+| `hello`       | `{ token, clientVersion, apiVersion }` — اولین پیام، حداکثر ۱۰ ثانیه فرصت |
+| `ping`        | `{ ts }`                                                                  |
+| `subscribe`   | `{ channelIds: [] }` — حداکثر ۲۰۰ کانال                                   |
+| `typing`      | `{ channelId }`                                                           |
+| `presence`    | `{ status: "online" \| "idle" \| "dnd" \| "offline" }`                    |
+| `ack_read`    | `{ channelId, messageId }`                                                |
+| `voice_state` | `{ channelId, muted, deafened, streaming }`                               |
 
 ### سرور → کلاینت
 
-| `op` | توضیح |
-|---|---|
-| `ready` | بعد از `hello` — شامل `sessionId`, `heartbeatInterval`, `apiVersion` |
-| `pong` | پاسخ `ping` با همان `t` |
-| `message_create` / `message_update` / `message_delete` | رویدادهای پیام |
-| `typing` | `{ channelId, userId, expiresAt }` |
-| `presence` | `{ userId, status }` |
-| `voice_state` | `{ channelId, userId, muted, deafened, speaking }` |
-| `channels_changed` | ساختار کانال‌ها عوض شد — `bootstrap` را دوباره بگیر |
-| `version_hint` | نسخهٔ جدید منتشر شد — `{ version, mandatory }` |
-| `error` | `{ code, message }` |
+| `t`                | توضیح                                                       |
+| ------------------ | ----------------------------------------------------------- |
+| `ready`            | `{ user, serverTime, apiVersion, latest }`                  |
+| `pong`             | `{ ts }`                                                    |
+| `message_create`   | `{ message }` — ری‌اکشن‌ها برای هر گیرنده شخصی‌سازی می‌شوند |
+| `message_update`   | `{ message }` — ویرایش متن یا تغییر پیوست                   |
+| `message_delete`   | `{ channelId, messageId }`                                  |
+| `reaction_update`  | `{ channelId, messageId, reactions }`                       |
+| `read_state`       | `{ channelId, unread, mentions }`                           |
+| `typing`           | `{ channelId, userId, displayName, expiresAt }`             |
+| `presence_update`  | `{ userId, status }`                                        |
+| `voice_update`     | `{ channelId, participants }`                               |
+| `channels_changed` | ساختار کانال‌ها عوض شد — `bootstrap` را دوباره بگیر         |
+| `version_hint`     | `{ latest, mandatory, minClient }`                          |
+| `error`            | `{ code, message }`                                         |
 
-heartbeat: هر **۲۵ ثانیه** `ping` بفرست. اگر ۶۰ ثانیه چیزی نیاید، اتصال بسته می‌شود.
+heartbeat: سرور هر **۲۵ ثانیه** ping می‌زند؛ اگر **۶۰ ثانیه** از کلاینت خبری نشود
+اتصال بسته می‌شود.
 
 ### کدهای بستن
 
-| کد | معنی |
-|---|---|
-| `4400` | پیام نامعتبر |
-| `4401` | تیکت نامعتبر یا منقضی |
-| `4403` | دسترسی ندارد |
-| `4406` | نسخهٔ API ناسازگار |
-| `4408` | heartbeat نرسید |
-| `4409` | نشست تکراری |
-| `4429` | rate limit |
-| `4500` | خطای سرور |
+| کد     | معنی                          |
+| ------ | ----------------------------- |
+| `4001` | تیکت/نشست نامعتبر             |
+| `4002` | نسخهٔ API ناسازگار            |
+| `4003` | کلاینت خیلی قدیمی است         |
+| `4008` | rate limit یا heartbeat نرسید |
+| `4100` | خاموشی نرم سرور               |
 
-### محدودیت‌ها (`LIMITS`)
+### محدودیت‌ها (`LIMITS` در `@sr/protocol`)
 
 ```
-MESSAGE_MAX_LENGTH   4000
-MESSAGES_PER_FETCH    100
-SUBSCRIBE_MAX_CHANNELS 200
-PAYLOAD_MAX_BYTES    65536
-TYPING_TTL_MS          8000
+messageLength          4000
+attachmentsPerMessage    10
+attachmentBytes       25 MB
+avatarBytes            4 MB
+reactionsPerMessage      24
+emojiLength              24
+messagesPerMinute        60
+typingPerMinute          30
+socketsPerUser            4
+heartbeatMs           25000
+heartbeatTimeoutMs    60000
 ```

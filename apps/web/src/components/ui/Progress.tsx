@@ -36,7 +36,10 @@ export function Progress({
         </div>
       ) : (
         <div
-          className={cn("h-full rounded-pill transition-[width] duration-200 ease-out", tones[tone])}
+          className={cn(
+            "h-full rounded-pill transition-[width] duration-200 ease-out",
+            tones[tone],
+          )}
           style={{ width: `${pct}%` }}
         />
       )}

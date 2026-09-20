@@ -12,6 +12,7 @@ interface Row {
   username: string;
   display_name: string;
   avatar_color: string;
+  avatar_url: string | null;
   status: string;
   is_admin: boolean;
   roles: { id: string; name: string; color: string; permissions: number }[] | null;
@@ -47,7 +48,7 @@ async function loadUser(key: string, mode: "ticket" | "session"): Promise<Gatewa
                   where s.user_id = u.id and s.token_hash = $1 and s.expires_at > now())`;
 
   const rows = await q<Row>(
-    `select u.id, u.username, u.display_name, u.avatar_color, u.status, u.is_admin,
+    `select u.id, u.username, u.display_name, u.avatar_color, u.avatar_url, u.status, u.is_admin,
             coalesce(
               (select json_agg(json_build_object(
                   'id', r.id, 'name', r.name, 'color', r.color, 'permissions', r.permissions)
@@ -71,6 +72,7 @@ async function loadUser(key: string, mode: "ticket" | "session"): Promise<Gatewa
     username: row.username,
     displayName: row.display_name,
     avatarColor: row.avatar_color,
+    avatarUrl: row.avatar_url,
     status: (row.status as PublicUser["status"]) ?? "offline",
     isAdmin: row.is_admin,
     roles: roles.map((r) => ({ id: r.id, name: r.name, color: r.color })),

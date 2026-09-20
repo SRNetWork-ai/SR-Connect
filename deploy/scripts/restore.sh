@@ -14,7 +14,8 @@ docker compose stop web gateway >/dev/null
 
 [ -f "$TMP/env" ] && { cp "$TMP/env" .env; chmod 600 .env; echo "  ✔ .env بازگردانی شد"; }
 [ -d "$TMP/keys" ] && { rm -rf keys; cp -r "$TMP/keys" keys; chmod 700 keys; echo "  ✔ کلیدها بازگردانی شدند"; }
-[ -d "$TMP/releases" ] && { cp -r "$TMP/releases/." releases/ 2>/dev/null || true; }
+[ -d "$TMP/releases" ] && { mkdir -p releases; cp -r "$TMP/releases/." releases/ 2>/dev/null || true; }
+[ -d "$TMP/uploads" ] && { mkdir -p uploads; cp -r "$TMP/uploads/." uploads/ 2>/dev/null || true; echo "  ✔ پیوست‌ها بازگردانی شدند"; }
 
 echo "▸ بازگردانی دیتابیس"
 docker compose up -d postgres >/dev/null

@@ -1,7 +1,13 @@
-import type { ChatMessage, PresenceStatus, PublicUser, VoiceParticipant } from "./types.js";
+import type {
+  ChatMessage,
+  PresenceStatus,
+  PublicUser,
+  Reaction,
+  VoiceParticipant,
+} from "./types.js";
 
 /** نسخه‌ی قرارداد realtime. اگر عوض شود کلاینت قدیمی باید آپدیت کند. */
-export const API_VERSION = 3;
+export const API_VERSION = 4;
 
 export type ClientMessage =
   | { t: "hello"; token: string; clientVersion: string; apiVersion: number }
@@ -9,6 +15,8 @@ export type ClientMessage =
   | { t: "subscribe"; channelIds: string[] }
   | { t: "typing"; channelId: string }
   | { t: "presence"; status: PresenceStatus }
+  /** تأیید خواندن کانال تا شمارنده‌ی خوانده‌نشده صفر شود. */
+  | { t: "ack_read"; channelId: string; messageId: string }
   | {
       t: "voice_state";
       channelId: string | null;
@@ -21,7 +29,10 @@ export type ServerMessage =
   | { t: "ready"; user: PublicUser; serverTime: number; apiVersion: number; latest: string }
   | { t: "pong"; ts: number }
   | { t: "message_create"; message: ChatMessage }
+  | { t: "message_update"; message: ChatMessage }
   | { t: "message_delete"; channelId: string; messageId: string }
+  | { t: "reaction_update"; channelId: string; messageId: string; reactions: Reaction[] }
+  | { t: "read_state"; channelId: string; unread: number; mentions: number }
   | { t: "typing"; channelId: string; userId: string; displayName: string; expiresAt: number }
   | { t: "presence_update"; userId: string; status: PresenceStatus }
   | { t: "voice_update"; channelId: string; participants: VoiceParticipant[] }
@@ -50,6 +61,11 @@ export const CLOSE_CODES = {
 /** محدودیت‌های سبک سمت سرور تا یک کلاینت خراب سرور را زمین نزند. */
 export const LIMITS = {
   messageLength: 4000,
+  attachmentsPerMessage: 10,
+  attachmentBytes: 25 * 1024 * 1024,
+  avatarBytes: 4 * 1024 * 1024,
+  reactionsPerMessage: 24,
+  emojiLength: 24,
   messagesPerMinute: 60,
   typingPerMinute: 30,
   socketsPerUser: 4,
