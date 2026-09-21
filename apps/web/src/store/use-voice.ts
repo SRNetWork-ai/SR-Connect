@@ -32,9 +32,13 @@ interface VoiceState {
   speaking: string[];
   ping: number | null;
   error: string | null;
+  /** متن مرحله‌ی جاری اتصال؛ برای اینکه کاربر بداند چه خبر است. */
+  phase: string | null;
 
   join(channelId: string): Promise<void>;
   leave(): Promise<void>;
+  /** لغو اتصالِ نیمه‌کاره بدون انتظار. */
+  cancel(): void;
   toggleMute(): Promise<void>;
   toggleDeafen(): Promise<void>;
   toggleScreenShare(): Promise<void>;
@@ -43,6 +47,30 @@ interface VoiceState {
 // اتاق LiveKit بیرون از state نگه داشته می‌شود؛ یک نمونه در کل اپ.
 let room: import("livekit-client").Room | null = null;
 let statsTimer: ReturnType<typeof setInterval> | null = null;
+/** شمارنده‌ی تلاش اتصال؛ نتیجه‌ی تلاش‌های قدیمی نباید state جدید را خراب کند. */
+let joinAttempt = 0;
+
+const TOKEN_TIMEOUT_MS = 8_000;
+const WS_TIMEOUT_MS = 8_000;
+const PC_TIMEOUT_MS = 10_000;
+const CONNECT_TIMEOUT_MS = 15_000;
+
+/** هر انتظار شبکه‌ای سقف زمانی دارد؛ وگرنه UI بی‌خود «هنگ» به نظر می‌رسد. */
+function withTimeout<T>(p: Promise<T>, ms: number, message: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), ms);
+    p.then(
+      (v) => {
+        clearTimeout(timer);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(timer);
+        reject(e);
+      },
+    );
+  });
+}
 
 export const useVoice = create<VoiceState>()((set, get) => ({
   status: "idle",
@@ -57,15 +85,26 @@ export const useVoice = create<VoiceState>()((set, get) => ({
   speaking: [],
   ping: null,
   error: null,
+  phase: null,
 
   async join(channelId) {
     if (get().channelId === channelId && get().status === "connected") return;
-    await get().leave();
-    set({ status: "connecting", channelId, error: null });
+    if (get().status === "connecting") return;
+    get().leave();
+    const attempt = ++joinAttempt;
+    const alive = () => attempt === joinAttempt;
+    set({ status: "connecting", channelId, error: null, phase: "گرفتن مجوز از سرور" });
 
     try {
-      const auth = await api.post<TokenResponse>("/api/voice/token", { channelId });
+      const auth = await withTimeout(
+        api.post<TokenResponse>("/api/voice/token", { channelId }),
+        TOKEN_TIMEOUT_MS,
+        "سرور مجوز صدا را نداد",
+      );
+      if (!alive()) return;
+      set({ phase: "بارگذاری موتور صدا" });
       const { Room, RoomEvent, Track } = await import("livekit-client");
+      if (!alive()) return;
 
       const r = new Room({
         adaptiveStream: true,
@@ -127,8 +166,35 @@ export const useVoice = create<VoiceState>()((set, get) => ({
         useApp.getState().publishVoiceState({ channelId: null, muted: false, deafened: false });
       });
 
-      await r.connect(auth.url, auth.token, { autoSubscribe: true });
-      if (auth.canSpeak) await r.localParticipant.setMicrophoneEnabled(true);
+      set({ phase: "برقراری تماس" });
+      // بدون تایم‌اوت صریح، LiveKit روی شبکه‌ی پرافت‌وخیز ده‌ها ثانیه تلاش می‌کند
+      // و کاربر فکر می‌کند دکمه کار نمی‌کند. سریع شکست می‌خوریم و پیام می‌دهیم.
+      await withTimeout(
+        r.connect(auth.url, auth.token, {
+          autoSubscribe: true,
+          maxRetries: 1,
+          websocketTimeout: WS_TIMEOUT_MS,
+          peerConnectionTimeout: PC_TIMEOUT_MS,
+        }),
+        CONNECT_TIMEOUT_MS,
+        "تماس برقرار نشد — احتمالاً پورت‌های UDP سرور بسته است",
+      );
+      if (!alive()) {
+        void r.disconnect().catch(() => {});
+        return;
+      }
+
+      set({ phase: "روشن کردن میکروفون" });
+      if (auth.canSpeak) {
+        // اگر مرورگر اجازه‌ی میکروفون نداد، تماس باید برقرار بماند.
+        await r.localParticipant.setMicrophoneEnabled(true).catch(() => {
+          useApp.getState().pushToast("میکروفون باز نشد؛ شنونده وارد شدی", "warning");
+        });
+      }
+      if (!alive()) {
+        void r.disconnect().catch(() => {});
+        return;
+      }
 
       useSession.getState().setInCall(true);
       set({
@@ -141,6 +207,7 @@ export const useVoice = create<VoiceState>()((set, get) => ({
         streaming: false,
         screens: [],
         error: null,
+        phase: null,
       });
 
       useApp
@@ -163,20 +230,33 @@ export const useVoice = create<VoiceState>()((set, get) => ({
         if (rtt !== null) set({ ping: rtt });
       }, 5_000);
     } catch (err) {
-      set({ status: "error", error: (err as Error).message, channelId: null });
+      if (!alive()) return;
+      const message = (err as Error).message || "اتصال صدا برقرار نشد";
+      if (room) {
+        void room.disconnect().catch(() => {});
+        room = null;
+      }
+      set({ status: "error", error: message, channelId: null, phase: null });
+      useApp.getState().pushToast(message, "error");
     }
   },
 
+  /**
+   * قطع تماس. عمداً منتظر disconnect نمی‌مانیم: بستن WebRTC می‌تواند
+   * چند ثانیه طول بکشد و کاربر باید همان لحظه ببیند که قطع شد.
+   */
   async leave() {
+    joinAttempt++;
     if (statsTimer) {
       clearInterval(statsTimer);
       statsTimer = null;
     }
-    document.querySelectorAll("[data-sr-voice]").forEach((el) => el.remove());
-    if (room) {
-      await room.disconnect().catch(() => {});
-      room = null;
+    if (typeof document !== "undefined") {
+      document.querySelectorAll("[data-sr-voice]").forEach((el) => el.remove());
     }
+    const old = room;
+    room = null;
+    if (old) void old.disconnect().catch(() => {});
     useSession.getState().setInCall(false);
     set({
       status: "idle",
@@ -186,8 +266,15 @@ export const useVoice = create<VoiceState>()((set, get) => ({
       screens: [],
       streaming: false,
       ping: null,
+      phase: null,
+      error: null,
     });
     useApp.getState().publishVoiceState({ channelId: null, muted: false, deafened: false });
+  },
+
+  cancel() {
+    void get().leave();
+    useApp.getState().pushToast("اتصال لغو شد", "info");
   },
 
   async toggleMute() {
@@ -216,7 +303,10 @@ export const useVoice = create<VoiceState>()((set, get) => ({
 
   /** اشتراک صفحه با صدای سیستم (اگر مرورگر اجازه دهد). */
   async toggleScreenShare() {
-    if (!room) return;
+    if (!room || get().status !== "connected") {
+      useApp.getState().pushToast("اول به یک کانال صوتی وصل شو، بعد صفحه را پخش کن", "warning");
+      return;
+    }
     const next = !get().streaming;
     if (next && !get().canShare) {
       useApp.getState().pushToast("اجازه‌ی اشتراک صفحه در این کانال را نداری", "error");

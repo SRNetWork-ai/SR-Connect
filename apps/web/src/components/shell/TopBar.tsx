@@ -17,6 +17,7 @@ export function TopBar() {
   const members = useApp((s) => s.members);
   const presence = useApp((s) => s.presence);
   const unread = useApp((s) => s.unread);
+  const setActiveChannel = useApp((s) => s.setActiveChannel);
   const [showMembers, setShowMembers] = useState(false);
   const [query, setQuery] = useState("");
 
@@ -42,8 +43,14 @@ export function TopBar() {
   const online = members.filter((m) => (presence[m.id] ?? "offline") !== "offline").length;
   const totalMentions = Object.values(unread).reduce((n, u) => n + u.mentions, 0);
 
+  /** اولین کانالی که منشن خوانده‌نشده دارد را باز می‌کند. */
+  function jumpToMention() {
+    const target = Object.entries(unread).find(([, u]) => u.mentions > 0)?.[0];
+    if (target) setActiveChannel(target);
+  }
+
   return (
-    <header className="relative flex h-[50px] shrink-0 items-center gap-2.5 px-4 shadow-line">
+    <header className="bar-glass relative z-20 flex h-[50px] shrink-0 items-center gap-2.5 px-4 shadow-line">
       <motion.span
         key={channel?.id}
         initial={{ scale: 0.7, opacity: 0 }}
@@ -79,8 +86,13 @@ export function TopBar() {
         </Tooltip>
 
         {totalMentions > 0 && (
-          <Tooltip label={`${fa(totalMentions)} منشن خوانده‌نشده`}>
-            <span className="relative grid size-8 place-items-center rounded-[4px] text-t3">
+          <Tooltip label={`${fa(totalMentions)} منشن خوانده‌نشده — برای رفتن کلیک کن`}>
+            <button
+              type="button"
+              onClick={jumpToMention}
+              aria-label="رفتن به منشن خوانده‌نشده"
+              className="relative grid size-8 place-items-center rounded-[4px] text-t3 hover:bg-hover hover:text-t1"
+            >
               <Bell className="size-4" />
               <motion.span
                 initial={{ scale: 0.4 }}
@@ -89,7 +101,7 @@ export function TopBar() {
               >
                 {fa(totalMentions > 9 ? "9+" : totalMentions)}
               </motion.span>
-            </span>
+            </button>
           </Tooltip>
         )}
 

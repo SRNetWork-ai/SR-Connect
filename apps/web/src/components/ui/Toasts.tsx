@@ -1,13 +1,14 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { CheckCircle2, Info, X, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Info, X, XCircle } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { useApp } from "@/store/use-app";
 
 const TONE = {
   info: { icon: Info, cls: "text-link" },
   success: { icon: CheckCircle2, cls: "text-success" },
+  warning: { icon: AlertTriangle, cls: "text-warning" },
   error: { icon: XCircle, cls: "text-danger" },
 } as const;
 
@@ -35,7 +36,8 @@ export function Toasts() {
               <p className="flex-1 text-sm text-t2">{t.text}</p>
               <button
                 onClick={() => dismiss(t.id)}
-                className="grid size-5 place-items-center rounded text-t4 hover:text-t1"
+                aria-label="بستن"
+                className="press grid size-5 place-items-center rounded text-t4 hover:bg-hover hover:text-t1"
               >
                 <X className="size-3.5" />
               </button>

@@ -18,14 +18,15 @@ export function Tooltip({
 }) {
   const [open, setOpen] = useState(false);
 
+  // از خصیصه‌های منطقی (start/end) استفاده می‌کنیم تا در RTL هم درست بنشیند.
   const pos =
     side === "top"
       ? "bottom-full left-1/2 -translate-x-1/2 mb-1.5"
       : side === "bottom"
         ? "top-full left-1/2 -translate-x-1/2 mt-1.5"
         : side === "start"
-          ? "right-full top-1/2 -translate-y-1/2 mr-1.5"
-          : "left-full top-1/2 -translate-y-1/2 ml-1.5";
+          ? "end-full top-1/2 -translate-y-1/2 me-1.5"
+          : "start-full top-1/2 -translate-y-1/2 ms-1.5";
 
   return (
     <span

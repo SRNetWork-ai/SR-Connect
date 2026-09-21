@@ -374,3 +374,291 @@
   font-size: 2.6rem;
   line-height: 1.15;
 }
+
+/* ───────────────────────────────────────────────────────────────
+   لایه‌ی تعامل — v1.2
+   هدف: هیچ کلیکی «مرده» حس نشود. بازخورد فشار، هاله‌ی فوکوس و
+   گذارهای یکدست روی همه‌ی کنترل‌ها، بدون نیاز به کد در هر کامپوننت.
+   ─────────────────────────────────────────────────────────────── */
+
+@keyframes ripple {
+  from {
+    opacity: 0.32;
+    transform: scale(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(2.6);
+  }
+}
+
+@keyframes glow-breathe {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+
+@keyframes gradient-pan {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 200% 50%;
+  }
+}
+
+@keyframes dash-run {
+  to {
+    stroke-dashoffset: -64;
+  }
+}
+
+@keyframes bump {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.28);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@layer base {
+  /* هر کنترل تعاملی: گذار یکدست + بازخورد فشار.
+     transform را جدا نگه می‌داریم تا با framer-motion تداخل نکند. */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  a[href],
+  summary,
+  label[for] {
+    transition:
+      background-color 0.14s ease,
+      color 0.14s ease,
+      border-color 0.14s ease,
+      box-shadow 0.18s ease,
+      opacity 0.14s ease;
+  }
+
+  /* اسکرول نرم‌تر در همه‌ی ناحیه‌های اسکرول‌شو */
+  .scroll-y {
+    scroll-behavior: smooth;
+    overscroll-behavior: contain;
+  }
+
+  /* هاله‌ی فوکوس فقط با کیبورد، نه با موس */
+  :focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+
+  button:disabled,
+  [aria-disabled="true"] {
+    cursor: not-allowed;
+  }
+
+  /* بازخورد فشار برای همه‌ی دکمه‌ها، بدون نیاز به کلاس در هر کامپوننت.
+     روی motion.button بی‌اثر است چون framer transform را inline می‌گذارد. */
+  button:not(:disabled):not([data-no-press]):active {
+    transform: scale(0.97);
+  }
+}
+
+/* بازخورد فشار برای دکمه‌های ساده‌ای که motion.button نیستند */
+.press {
+  transition: transform 0.12s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.press:active:not(:disabled) {
+  transform: scale(0.96);
+}
+.press-soft:active:not(:disabled) {
+  transform: scale(0.985);
+}
+
+/* موج کلیک — روی کانتینر position:relative و overflow:hidden بگذار */
+.ripple {
+  position: absolute;
+  border-radius: 9999px;
+  background: currentColor;
+  pointer-events: none;
+  animation: ripple 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* نوار گرادیانی متحرک — برای حالت‌های «در حال انجام» */
+.progress-sheen {
+  background: linear-gradient(
+    100deg,
+    var(--color-brand) 0%,
+    var(--color-accent) 35%,
+    var(--color-brand) 70%,
+    var(--color-accent) 100%
+  );
+  background-size: 200% 100%;
+  animation: gradient-pan 2.2s linear infinite;
+}
+
+/* هاله‌ی نفس‌کش دور عناصر فعال (کانال صوتی متصل، دکمه‌ی لایو) */
+.glow-active {
+  position: relative;
+}
+.glow-active::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  box-shadow:
+    0 0 0 1px var(--color-success-soft),
+    0 0 18px -4px var(--color-success);
+  animation: glow-breathe 2.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* پرش کوچک برای شمارنده‌ها (نخوانده‌ها، ری‌اکشن) */
+.bump {
+  animation: bump 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* کارت شیشه‌ای ارتقا یافته */
+.surface-raised {
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--color-card) 88%, #fff 5%),
+    var(--color-card)
+  );
+  box-shadow:
+    0 1px 0 0 color-mix(in oklab, #fff 8%, transparent) inset,
+    0 8px 24px -12px #000;
+}
+
+/* احترام به تنظیم کاهش حرکت سیستم */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ───────────────────────────────────────────────────────────────
+   لایه‌ی عمق — v1.2
+   قبلاً همه‌ی سطح‌ها یک خاکستری تخت بودند و اپ «خشک» به نظر می‌رسید.
+   این‌ها گرادیان‌های بسیار ملایم + هاله‌ی رنگی‌اند: چشم عمق می‌بیند
+   ولی خوانایی متن دست نمی‌خورد.
+   ─────────────────────────────────────────────────────────────── */
+
+@utility bg-rail-deep {
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--color-rail) 88%, #fff 3%),
+    var(--color-rail)
+  );
+  box-shadow: 1px 0 0 0 rgb(0 0 0 / 0.35) inset;
+}
+
+@utility bg-sidebar-deep {
+  background:
+    radial-gradient(
+      120% 60% at 50% 0%,
+      color-mix(in oklab, var(--color-brand) 9%, transparent),
+      transparent 70%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--color-sidebar) 94%, #fff 3%),
+      var(--color-sidebar) 40%,
+      color-mix(in oklab, var(--color-sidebar) 96%, #000 6%)
+    );
+}
+
+@utility bg-chat-deep {
+  background:
+    radial-gradient(
+      90% 40% at 50% 0%,
+      color-mix(in oklab, var(--color-brand) 7%, transparent),
+      transparent 65%
+    ),
+    linear-gradient(180deg, color-mix(in oklab, var(--color-chat) 96%, #fff 2%), var(--color-chat));
+}
+
+/* سرصفحه‌ها: شیشه‌ای تا محتوای زیرشان کمی دیده شود */
+@utility bar-glass {
+  background: color-mix(in oklab, var(--color-chat) 82%, transparent);
+  backdrop-filter: blur(12px) saturate(130%);
+}
+
+/* ردیف پیام: هاور گرد و نرم، نه یک مستطیل خشک */
+.msg-row {
+  border-radius: 8px;
+  transition:
+    background-color 0.13s ease,
+    box-shadow 0.13s ease;
+}
+.msg-row:hover {
+  background: color-mix(in oklab, #fff 3.5%, transparent);
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.04) inset;
+}
+
+/* بدنه‌ی پیام: فاصله‌ی خطوط بازتر، خواندن راحت‌تر */
+.msg-body {
+  font-size: 0.975rem;
+  line-height: 1.72;
+  color: var(--color-t2);
+  overflow-wrap: anywhere;
+}
+
+/* پوسته‌ی نویسنده: با فوکوس، هاله می‌گیرد تا بدانی فعال است */
+.composer-shell {
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--color-card) 90%, #fff 4%),
+    var(--color-card)
+  );
+  border: 1px solid rgb(255 255 255 / 0.06);
+  box-shadow: 0 6px 20px -14px #000;
+  transition:
+    border-color 0.16s ease,
+    box-shadow 0.2s ease;
+}
+.composer-shell:focus-within {
+  border-color: color-mix(in oklab, var(--color-brand) 55%, transparent);
+  box-shadow:
+    0 0 0 3px var(--color-brand-soft),
+    0 8px 24px -16px #000;
+}
+
+/* ورودی‌ها: هاله‌ی فوکوس هماهنگ با برند */
+input:focus-visible,
+textarea:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--color-brand) 70%, transparent);
+}
+
+/* اسکرول‌بار باریک‌تر و کم‌رنگ‌تر؛ با هاور پررنگ می‌شود */
+.scroll-y::-webkit-scrollbar {
+  width: 10px;
+}
+.scroll-y::-webkit-scrollbar-thumb {
+  background: rgb(255 255 255 / 0.07);
+  border: 3px solid transparent;
+  border-radius: 8px;
+  background-clip: padding-box;
+}
+.scroll-y:hover::-webkit-scrollbar-thumb {
+  background: rgb(255 255 255 / 0.14);
+  background-clip: padding-box;
+}
+
+/* جداکننده‌ی نرم با محو شدن دو طرف */
+.rule-soft {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--color-divider), transparent);
+}

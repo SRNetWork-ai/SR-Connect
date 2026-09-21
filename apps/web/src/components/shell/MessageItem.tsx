@@ -3,7 +3,9 @@
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertCircle,
+  Copy,
   CornerUpLeft,
+  Link2,
   Loader2,
   MoreHorizontal,
   Pencil,
@@ -21,6 +23,7 @@ import { AttachmentGrid } from "@/components/shell/AttachmentGrid";
 import { Markdown } from "@/lib/markdown";
 import { cn } from "@/lib/cn";
 import { fa } from "@/lib/fmt";
+import { Menu } from "@/components/ui/Menu";
 import { useApp } from "@/store/use-app";
 
 const time = new Intl.DateTimeFormat("fa-IR", { hour: "2-digit", minute: "2-digit" });
@@ -43,6 +46,7 @@ export function MessageItem({
   const editMessage = useApp((s) => s.editMessage);
   const deleteMessage = useApp((s) => s.deleteMessage);
   const toggleReaction = useApp((s) => s.toggleReaction);
+  const pushToast = useApp((s) => s.pushToast);
 
   const [picker, setPicker] = useState(false);
   const [menu, setMenu] = useState(false);
@@ -79,11 +83,10 @@ export function MessageItem({
       data-testid="message"
       data-message-id={message.id}
       className={cn(
-        "group relative px-4 transition-colors",
-        compact ? "py-0.5" : "mt-3 py-0.5 first:mt-0",
-        mentionsMe
-          ? "bg-[#5865f210] before:absolute before:inset-y-0 before:start-0 before:w-0.5 before:bg-brand"
-          : "hover:bg-[#2b2d31]/55",
+        "msg-row group relative mx-2 px-3 transition-colors",
+        compact ? "py-1" : "mt-3.5 py-1 first:mt-0",
+        mentionsMe &&
+          "bg-[#5865f214] before:absolute before:inset-y-0 before:start-0 before:w-0.5 before:rounded-full before:bg-brand",
         message.failed && "bg-danger-soft/40",
       )}
     >
@@ -174,7 +177,7 @@ export function MessageItem({
                 content={message.content}
                 options={{ names, meId: me?.id }}
                 className={cn(
-                  "text-base",
+                  "msg-body",
                   message.system ? "text-t4 italic" : "text-t2",
                   message.failed && "text-danger",
                 )}
@@ -308,9 +311,45 @@ export function MessageItem({
               </Tooltip>
             )}
             {!mine && !canManage && (
-              <button className="grid size-7 place-items-center rounded-[5px] text-t3 hover:bg-hover hover:text-t1">
-                <MoreHorizontal className="size-4" />
-              </button>
+              <Menu
+                label="کارهای بیشتر روی پیام"
+                align="end"
+                items={[
+                  {
+                    label: "کپی متن پیام",
+                    icon: <Copy className="size-4" />,
+                    onSelect: () => void copyToClipboard(message.content, pushToast),
+                  },
+                  {
+                    label: "کپی لینک پیام",
+                    icon: <Link2 className="size-4" />,
+                    onSelect: () =>
+                      void copyToClipboard(
+                        `${typeof window === "undefined" ? "" : window.location.origin}/app?m=${message.id}`,
+                        pushToast,
+                        "لینک پیام کپی شد",
+                      ),
+                  },
+                  {
+                    label: "پاسخ به این پیام",
+                    icon: <Reply className="size-4" />,
+                    separated: true,
+                    onSelect: () => setReplyTarget(message),
+                  },
+                ]}
+                trigger={({ open, toggle }) => (
+                  <button
+                    type="button"
+                    onClick={toggle}
+                    aria-expanded={open}
+                    aria-haspopup="menu"
+                    aria-label="کارهای بیشتر"
+                    className="press grid size-7 place-items-center rounded-[5px] text-t3 hover:bg-hover hover:text-t1"
+                  >
+                    <MoreHorizontal className="size-4" />
+                  </button>
+                )}
+              />
             )}
 
             <div className="absolute end-0 bottom-full">
@@ -371,4 +410,18 @@ export function MessageItem({
       </AnimatePresence>
     </motion.div>
   );
+}
+
+/** کپی متن در کلیپ‌بورد با بازخورد. */
+async function copyToClipboard(
+  text: string,
+  toast: (t: string, k?: "info" | "success" | "warning" | "error") => void,
+  okMessage = "متن پیام کپی شد",
+) {
+  try {
+    await navigator.clipboard.writeText(text);
+    toast(okMessage, "success");
+  } catch {
+    toast("مرورگر اجازه‌ی کپی نداد", "warning");
+  }
 }

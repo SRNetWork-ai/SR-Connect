@@ -11,7 +11,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <div className="flex h-dvh overflow-hidden">
         <ServerRail />
         <ChannelSidebar />
-        <main className="flex min-w-0 flex-1 flex-col bg-chat">
+        <main className="bg-chat-deep flex min-w-0 flex-1 flex-col">
           <UpdateBanner />
           <ScreenShareView />
           {children}

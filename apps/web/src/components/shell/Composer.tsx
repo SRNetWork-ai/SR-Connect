@@ -141,7 +141,8 @@ export function Composer() {
             <span className="truncate text-t4">{replyTarget.content.slice(0, 90)}</span>
             <button
               onClick={() => setReplyTarget(null)}
-              className="ms-auto grid size-5 place-items-center rounded text-t4 hover:text-t1"
+              aria-label="لغو پاسخ"
+              className="press ms-auto grid size-5 place-items-center rounded text-t4 hover:bg-hover hover:text-t1"
             >
               <X className="size-3.5" />
             </button>
@@ -198,7 +199,7 @@ export function Composer() {
           if (canAttach) addFiles(e.dataTransfer.files);
         }}
         className={cn(
-          "rounded-lg bg-card",
+          "composer-shell rounded-xl",
           replyTarget && "rounded-t-none",
           disabled && "opacity-60",
         )}

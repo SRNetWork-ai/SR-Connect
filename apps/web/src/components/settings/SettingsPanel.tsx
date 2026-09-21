@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   Camera,
   Hash,
@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/Button";
 import { Field } from "@/components/ui/Input";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/cn";
+import { riseIn, springSnappy, tap } from "@/lib/motion";
 import { fa } from "@/lib/fmt";
 import { useApp } from "@/store/use-app";
 
@@ -82,9 +83,12 @@ export function SettingsPanel() {
               ["audit", "گزارش فعالیت", ScrollText],
             ] as const
           ).map(([id, label, Icon]) => (
-            <button
+            <motion.button
               key={id}
+              type="button"
+              whileTap={tap}
               onClick={() => setTab(id)}
+              aria-selected={tab === id}
               className={cn(
                 "relative flex items-center gap-1.5 rounded-[6px] px-3 py-1.5 text-sm transition-colors",
                 tab === id ? "text-white" : "bg-card text-t3 hover:bg-hover",
@@ -93,13 +97,13 @@ export function SettingsPanel() {
               {tab === id && (
                 <motion.span
                   layoutId="settings-tab"
-                  transition={{ type: "spring", stiffness: 420, damping: 34 }}
-                  className="absolute inset-0 -z-10 rounded-[6px] bg-brand"
+                  transition={springSnappy}
+                  className="absolute inset-0 -z-10 rounded-[6px] bg-brand shadow-[0_4px_14px_-6px_var(--color-brand)]"
                 />
               )}
               <Icon className="size-3.5" />
               {label}
-            </button>
+            </motion.button>
           ))}
         </nav>
 
@@ -107,19 +111,31 @@ export function SettingsPanel() {
           <p className="rounded-md bg-danger-soft px-3 py-2 text-sm text-[#ff8a8d]">{error}</p>
         )}
 
-        {tab === "profile" && <ProfileTab />}
-        {tab === "channels" && (
-          <ChannelsTab
-            canManage={canManageChannels}
-            channels={channels}
-            categories={categories}
-            onChanged={refreshChannels}
-            onError={onError}
-          />
-        )}
-        {tab === "roles" && <RolesTab canManage={canManageRoles} onError={onError} />}
-        {tab === "invites" && <InvitesTab canManage={canInvite} onError={onError} />}
-        {tab === "audit" && <AuditTab canManage={canAudit} onError={onError} />}
+        {/* محتوای تب با گذار نرم عوض می‌شود تا جابه‌جایی «پرش» نداشته باشد. */}
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={tab}
+            variants={riseIn}
+            initial="hidden"
+            animate="show"
+            exit="exit"
+            className="space-y-5"
+          >
+            {tab === "profile" && <ProfileTab />}
+            {tab === "channels" && (
+              <ChannelsTab
+                canManage={canManageChannels}
+                channels={channels}
+                categories={categories}
+                onChanged={refreshChannels}
+                onError={onError}
+              />
+            )}
+            {tab === "roles" && <RolesTab canManage={canManageRoles} onError={onError} />}
+            {tab === "invites" && <InvitesTab canManage={canInvite} onError={onError} />}
+            {tab === "audit" && <AuditTab canManage={canAudit} onError={onError} />}
+          </motion.div>
+        </AnimatePresence>
       </div>
     </div>
   );

@@ -14,6 +14,7 @@ import { api, ApiError } from "@/lib/api";
 import { APP_VERSION, serverEndpoint } from "@/lib/config";
 import { fa } from "@/lib/fmt";
 import { useSession } from "@/store/use-session";
+import { Dialog } from "@/components/ui/Dialog";
 
 type Reach = "checking" | "online" | "offline";
 
@@ -27,6 +28,7 @@ export function LoginForm() {
   const [identity, setIdentity] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(true);
+  const [forgot, setForgot] = useState(false);
   const [busy, setBusy] = useState(false);
   const [errors, setErrors] = useState<{ identity?: string; password?: string; form?: string }>({});
   const [reach, setReach] = useState<Reach>("checking");
@@ -147,7 +149,11 @@ export function LoginForm() {
               onChange={(e) => setPassword(e.target.value)}
               error={errors.password}
             />
-            <button type="button" className="mt-1.5 text-sm text-link hover:underline">
+            <button
+              type="button"
+              onClick={() => setForgot(true)}
+              className="press mt-1.5 text-sm text-link hover:underline"
+            >
               گذرواژه را فراموش کردی؟
             </button>
           </div>
@@ -183,6 +189,26 @@ export function LoginForm() {
       <QrPanel />
 
       <span className="tnum absolute bottom-2 end-3 text-2xs text-t5">نسخه {fa(APP_VERSION)}</span>
+
+      {/* بازیابی گذرواژه روی سرور خودی ایمیل ندارد؛ مدیر سرور بازنشانی می‌کند. */}
+      <Dialog
+        open={forgot}
+        onClose={() => setForgot(false)}
+        title="بازیابی گذرواژه"
+        description="این سرور خودمیزبان است و سرویس ایمیل ندارد، پس لینک بازیابی فرستاده نمی‌شود. مدیر سرور می‌تواند گذرواژه‌ات را از روی خود سرور بازنشانی کند."
+        footer={
+          <Button type="button" onClick={() => setForgot(false)}>
+            فهمیدم
+          </Button>
+        }
+      >
+        <div className="rounded-lg border border-divider bg-deep p-3">
+          <p className="mb-2 text-2xs font-bold text-t4">دستور بازنشانی (روی سرور):</p>
+          <code className="block text-2xs leading-relaxed text-t2 select-all" dir="ltr">
+            sudo bash /opt/sr-connect/deploy/scripts/reset-password.sh &lt;username&gt;
+          </code>
+        </div>
+      </Dialog>
     </Reveal>
   );
 }

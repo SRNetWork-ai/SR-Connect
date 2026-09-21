@@ -1,80 +1,112 @@
 "use client";
 
+import { motion } from "framer-motion";
 import { Download, MessageSquare, Settings, Shield } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { cn } from "@/lib/cn";
 import { fa } from "@/lib/fmt";
+import { springSnappy, tap } from "@/lib/motion";
 import { Logo } from "@/components/ui/Logo";
+import { Tooltip } from "@/components/ui/Tooltip";
 import { useApp } from "@/store/use-app";
+import { useShell, type ShellView } from "@/store/use-shell";
 
 interface NavItem {
-  href: string;
+  view: ShellView;
   label: string;
   icon: typeof MessageSquare;
-  exact?: boolean;
 }
 
 const NAV: NavItem[] = [
-  { href: "/app", label: "گفت‌وگو", icon: MessageSquare, exact: true },
-  { href: "/app/updates", label: "مرکز آپدیت", icon: Download },
-  { href: "/app/settings", label: "تنظیمات و نقش‌ها", icon: Settings },
+  { view: "chat", label: "گفت‌وگو", icon: MessageSquare },
+  { view: "updates", label: "مرکز آپدیت", icon: Download },
+  { view: "settings", label: "تنظیمات و نقش‌ها", icon: Settings },
 ];
 
 export function ServerRail() {
-  const pathname = usePathname();
+  const view = useShell((s) => s.view);
+  const setView = useShell((s) => s.setView);
   const isAdmin = useApp((s) => Boolean(s.me?.isAdmin));
   const hasUpdate = useApp((s) => Boolean(s.versionHint));
   const online = useApp((s) => Object.values(s.presence).filter((p) => p !== "offline").length);
+  const unreadTotal = useApp((s) =>
+    Object.values(s.unread).reduce((sum, u) => sum + (u?.unread ?? 0), 0),
+  );
 
   return (
     <nav
       aria-label="بخش‌ها"
-      className="flex w-[72px] shrink-0 flex-col items-center gap-2 bg-rail py-3"
+      className="bg-rail-deep flex w-[72px] shrink-0 flex-col items-center gap-2 py-3"
     >
-      <Link href="/" title="صفحه‌ی اسپلش">
-        <Logo size={48} />
-      </Link>
+      <Tooltip label="صفحه‌ی اسپلش" side="end">
+        <Link href="/" className="press rounded-[16px]">
+          <Logo size={48} />
+        </Link>
+      </Tooltip>
       <span className="my-1 h-0.5 w-8 rounded-full bg-[#35363c]" />
 
       {NAV.map((item) => {
-        const active = item.exact ? pathname === item.href : pathname.startsWith(item.href);
-        const badge = item.href === "/app/updates" && hasUpdate ? 1 : 0;
+        const active = view === item.view;
+        const badge =
+          item.view === "updates" && hasUpdate
+            ? 1
+            : item.view === "chat" && !active
+              ? unreadTotal
+              : 0;
         return (
-          <Link
-            key={item.href}
-            href={item.href}
-            title={item.label}
-            aria-current={active ? "page" : undefined}
-            className={cn(
-              "relative grid size-12 place-items-center transition-all duration-150",
-              active
-                ? "rounded-[14px] bg-brand text-white"
-                : "rounded-[16px] bg-card text-t2 hover:rounded-[14px] hover:bg-brand hover:text-white",
-            )}
-          >
-            <item.icon className="size-5" />
-            {active && (
-              <span className="absolute -end-4 h-10 w-1 rounded-full bg-white" aria-hidden />
-            )}
-            {badge > 0 && (
-              <span className="absolute -bottom-0.5 -start-0.5 grid h-5 min-w-5 place-items-center rounded-pill border-[3px] border-rail bg-danger px-1 text-2xs font-bold text-white">
-                {fa(badge)}
-              </span>
-            )}
-          </Link>
+          <Tooltip key={item.view} label={item.label} side="end">
+            <motion.button
+              type="button"
+              whileTap={tap}
+              onClick={() => setView(item.view)}
+              aria-current={active ? "page" : undefined}
+              aria-label={item.label}
+              className={cn(
+                "relative grid size-12 place-items-center transition-[background-color,color,border-radius] duration-150",
+                active
+                  ? "rounded-[14px] bg-brand text-white"
+                  : "rounded-[16px] bg-card text-t2 hover:rounded-[14px] hover:bg-brand hover:text-white",
+              )}
+            >
+              <item.icon className="size-5" />
+
+              {/* نشانگر فعال با layoutId بین آیتم‌ها می‌سُرد، نه اینکه بپرد. */}
+              {active && (
+                <motion.span
+                  layoutId="rail-indicator"
+                  transition={springSnappy}
+                  className="absolute -end-4 h-10 w-1 rounded-full bg-white"
+                  aria-hidden
+                />
+              )}
+
+              {badge > 0 && (
+                <motion.span
+                  key={badge}
+                  initial={{ scale: 0.4, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={springSnappy}
+                  className="absolute -bottom-0.5 -start-0.5 grid h-5 min-w-5 place-items-center rounded-pill border-[3px] border-rail bg-danger px-1 text-2xs font-bold text-white"
+                >
+                  {fa(badge > 99 ? 99 : badge)}
+                </motion.span>
+              )}
+            </motion.button>
+          </Tooltip>
         );
       })}
 
       <div className="mt-auto flex flex-col items-center gap-1">
         {isAdmin && (
-          <span title="دسترسی مدیر" className="grid size-8 place-items-center text-warning">
-            <Shield className="size-4" />
-          </span>
+          <Tooltip label="دسترسی مدیر" side="end">
+            <span className="grid size-8 place-items-center text-warning">
+              <Shield className="size-4" />
+            </span>
+          </Tooltip>
         )}
-        <span className="tnum text-2xs text-t5" title="کاربران آنلاین">
-          {fa(online)}
-        </span>
+        <Tooltip label="کاربران آنلاین" side="end">
+          <span className="tnum text-2xs text-t5">{fa(online)}</span>
+        </Tooltip>
       </div>
     </nav>
   );

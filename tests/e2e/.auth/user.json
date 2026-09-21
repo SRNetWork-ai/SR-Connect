@@ -2,10 +2,10 @@
   "cookies": [
     {
       "name": "sr_session",
-      "value": "KIdypI9KmpeW0nW-hkhTH_XyYyoLSsYmsYI_v_x8KgI",
+      "value": "Oke98nuwltnkFYTZ_bSbcnVftHTdWUtuPTe0U3ny8wc",
       "domain": "127.0.0.1",
       "path": "/",
-      "expires": 1792595718.148711,
+      "expires": 1792614212.823825,
       "httpOnly": true,
       "secure": true,
       "sameSite": "Lax"
@@ -21,7 +21,7 @@
         },
         {
           "name": "sr.device.id",
-          "value": "78046dd0-ed66-4ec9-89b4-f704cfbf72c8"
+          "value": "076def53-98e2-4247-92ff-ad3217ec48d5"
         }
       ]
     }

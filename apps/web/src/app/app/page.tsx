@@ -1,15 +1,7 @@
-import { Composer } from "@/components/shell/Composer";
-import { MessageList } from "@/components/shell/MessageList";
-import { TopBar } from "@/components/shell/TopBar";
+import { ShellViews } from "@/components/shell/ShellViews";
 
 export const metadata = { title: "گفت‌وگوی عمومی" };
 
 export default function AppPage() {
-  return (
-    <>
-      <TopBar />
-      <MessageList />
-      <Composer />
-    </>
-  );
+  return <ShellViews initial="chat" />;
 }

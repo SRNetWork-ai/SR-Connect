@@ -1,7 +1,7 @@
-import { UpdateCenter } from "@/components/updates/UpdateCenter";
+import { ShellViews } from "@/components/shell/ShellViews";
 
 export const metadata = { title: "مرکز آپدیت" };
 
 export default function UpdatesPage() {
-  return <UpdateCenter />;
+  return <ShellViews initial="updates" />;
 }

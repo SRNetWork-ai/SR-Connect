@@ -1,7 +1,19 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronDown, Hash, HeadphoneOff, Lock, MicOff, Radio, Volume2 } from "lucide-react";
+import {
+  ChevronDown,
+  Copy,
+  Download,
+  Hash,
+  HeadphoneOff,
+  Link2,
+  Lock,
+  MicOff,
+  Radio,
+  Settings,
+  Volume2,
+} from "lucide-react";
 import { useMemo, useState } from "react";
 import type { Channel, VoiceParticipant } from "@sr/protocol";
 import { cn } from "@/lib/cn";
@@ -12,6 +24,9 @@ import { UserPanel } from "@/components/shell/UserPanel";
 import { VoiceStatus } from "@/components/shell/VoiceStatus";
 import { useApp } from "@/store/use-app";
 import { useVoice } from "@/store/use-voice";
+import { Menu } from "@/components/ui/Menu";
+import { springSnappy, tapSoft } from "@/lib/motion";
+import { useShell } from "@/store/use-shell";
 import { SERVER_URL } from "@/lib/config";
 
 /** مرجع ثابت تا سلکتور zustand هر رندر آرایه‌ی تازه نسازد. */
@@ -24,6 +39,9 @@ export function ChannelSidebar() {
   const setActiveChannel = useApp((s) => s.setActiveChannel);
   const stats = useApp((s) => s.stats);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const pushToast = useApp((s) => s.pushToast);
+  const isAdmin = useApp((s) => Boolean(s.me?.isAdmin));
+  const setView = useShell((s) => s.setView);
 
   const groups = useMemo(() => {
     const ordered = [...categories].sort((a, b) => a.position - b.position);
@@ -43,18 +61,57 @@ export function ChannelSidebar() {
   const host = SERVER_URL ? SERVER_URL.replace(/^https?:\/\//, "") : "سرور خودی";
 
   return (
-    <div className="flex w-[252px] shrink-0 flex-col bg-sidebar">
-      {/* سرصفحه‌ی سرور */}
-      <button className="group relative flex h-[50px] items-center justify-between overflow-hidden px-4 shadow-line transition-colors hover:bg-hover/50">
-        <span className="pointer-events-none absolute inset-0 bg-gradient-to-l from-brand/12 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
-        <span className="relative text-start">
-          <span className="block text-base font-bold text-t1">سرور SR-Connect</span>
-          <span className="block text-2xs text-t4" dir="ltr">
-            {host}
-          </span>
-        </span>
-        <ChevronDown className="relative size-4 text-t3 transition-transform group-hover:translate-y-0.5" />
-      </button>
+    <div className="bg-sidebar-deep flex w-[252px] shrink-0 flex-col">
+      {/* سرصفحه‌ی سرور — منوی واقعی، نه دکمه‌ی تزئینی */}
+      <Menu
+        label="منوی سرور"
+        align="start"
+        className="shadow-line"
+        items={[
+          {
+            label: "کپی لینک سرور",
+            icon: <Link2 className="size-4" />,
+            onSelect: () => void copyText(origin(), "لینک سرور کپی شد", pushToast),
+          },
+          {
+            label: "کپی آدرس میزبان",
+            icon: <Copy className="size-4" />,
+            onSelect: () => void copyText(host, "آدرس میزبان کپی شد", pushToast),
+          },
+          {
+            label: "مرکز آپدیت",
+            icon: <Download className="size-4" />,
+            separated: true,
+            onSelect: () => setView("updates"),
+          },
+          {
+            label: isAdmin ? "تنظیمات سرور و نقش‌ها" : "تنظیمات من",
+            icon: <Settings className="size-4" />,
+            onSelect: () => setView("settings"),
+          },
+        ]}
+        trigger={({ open, toggle }) => (
+          <motion.button
+            type="button"
+            whileTap={tapSoft}
+            onClick={toggle}
+            aria-expanded={open}
+            aria-haspopup="menu"
+            className="group relative flex h-[50px] w-full items-center justify-between overflow-hidden px-4 transition-colors hover:bg-hover/50"
+          >
+            <span className="pointer-events-none absolute inset-0 bg-gradient-to-l from-brand/12 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
+            <span className="relative text-start">
+              <span className="block text-base font-bold text-t1">سرور SR-Connect</span>
+              <span className="block text-2xs text-t4" dir="ltr">
+                {host}
+              </span>
+            </span>
+            <motion.span animate={{ rotate: open ? 180 : 0 }} transition={springSnappy}>
+              <ChevronDown className="relative size-4 text-t3" />
+            </motion.span>
+          </motion.button>
+        )}
+      />
 
       <div className="scroll-y flex-1 px-2 pt-2">
         {groups.map((group) => {
@@ -229,4 +286,25 @@ function ChannelRow({
       </AnimatePresence>
     </div>
   );
+}
+
+/** آدرس ریشه‌ی سرور برای اشتراک‌گذاری. */
+function origin(): string {
+  if (SERVER_URL) return SERVER_URL;
+  return typeof window === "undefined" ? "" : window.location.origin;
+}
+
+/** کپی در کلیپ‌بورد با پیام موفقیت؛ در مرورگرهای قدیمی به fallback می‌افتد. */
+async function copyText(
+  text: string,
+  okMessage: string,
+  toast: (t: string, k?: "info" | "success" | "warning" | "error") => void,
+) {
+  if (!text) return;
+  try {
+    await navigator.clipboard.writeText(text);
+    toast(okMessage, "success");
+  } catch {
+    toast("مرورگر اجازه‌ی کپی نداد؛ دستی کپی کن", "warning");
+  }
 }

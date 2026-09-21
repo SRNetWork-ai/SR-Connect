@@ -21,7 +21,7 @@ export interface Member extends PublicUser {
 
 export interface Toast {
   id: string;
-  kind: "info" | "success" | "error";
+  kind: "info" | "success" | "warning" | "error";
   text: string;
 }
 

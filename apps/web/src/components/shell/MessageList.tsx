@@ -8,6 +8,7 @@ import { MessageItem } from "@/components/shell/MessageItem";
 import { MessageSkeleton } from "@/components/ui/Skeleton";
 import { cn } from "@/lib/cn";
 import { fa } from "@/lib/fmt";
+import { springSoft } from "@/lib/motion";
 import { useApp } from "@/store/use-app";
 
 const day = new Intl.DateTimeFormat("fa-IR", { dateStyle: "long" });
@@ -97,7 +98,7 @@ export function MessageList() {
           <div className="flex justify-center py-3">
             <button
               onClick={() => channelId && void loadHistory(channelId, { older: true })}
-              className="flex items-center gap-1.5 rounded-pill bg-card px-3 py-1 text-xs text-t3 transition-colors hover:bg-hover"
+              className="press flex items-center gap-1.5 rounded-pill bg-card px-3 py-1 text-xs text-t3 transition-colors hover:bg-hover"
             >
               {loading && <Loader2 className="size-3 animate-spin" />}
               پیام‌های قدیمی‌تر
@@ -147,7 +148,14 @@ export function MessageList() {
               !prev ||
               new Date(prev.createdAt).toDateString() !== new Date(m.createdAt).toDateString();
             return (
-              <div key={m.id}>
+              <motion.div
+                key={m.id}
+                layout="position"
+                initial={m.pending ? { opacity: 0, y: 6 } : false}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, height: 0, marginBlock: 0 }}
+                transition={springSoft}
+              >
                 {newDay && (
                   <div className="my-4 flex items-center gap-3 px-4">
                     <span className="h-px flex-1 bg-divider" />
@@ -158,7 +166,7 @@ export function MessageList() {
                   </div>
                 )}
                 <MessageItem message={m} compact={!newDay && isCompact(prev, m)} names={names} />
-              </div>
+              </motion.div>
             );
           })}
         </AnimatePresence>

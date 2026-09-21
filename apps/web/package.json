@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit",
     "migrate": "node scripts/migrate.mjs",
     "seed": "node scripts/seed.mjs",
+    "reset-password": "node scripts/reset-password.mjs",
     "keygen": "node scripts/keygen.mjs",
     "sign-release": "node scripts/sign-release.mjs"
   },
