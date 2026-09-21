@@ -1,0 +1,29 @@
+{
+  "cookies": [
+    {
+      "name": "sr_session",
+      "value": "KIdypI9KmpeW0nW-hkhTH_XyYyoLSsYmsYI_v_x8KgI",
+      "domain": "127.0.0.1",
+      "path": "/",
+      "expires": 1792595718.148711,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "Lax"
+    }
+  ],
+  "origins": [
+    {
+      "origin": "http://127.0.0.1:3100",
+      "localStorage": [
+        {
+          "name": "sr.session",
+          "value": "{\"state\":{\"user\":{\"id\":\"66ba49f4-147f-4b3b-868e-8d9fe073b112\",\"name\":\"تست خودکار\",\"tag\":\"@e2e\",\"color\":\"#5865F2\"},\"serverUrl\":\"\",\"rememberMe\":true},\"version\":0}"
+        },
+        {
+          "name": "sr.device.id",
+          "value": "78046dd0-ed66-4ec9-89b4-f704cfbf72c8"
+        }
+      ]
+    }
+  ]
+}

@@ -3,7 +3,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronDown, Hash, HeadphoneOff, Lock, MicOff, Radio, Volume2 } from "lucide-react";
 import { useMemo, useState } from "react";
-import type { Channel } from "@sr/protocol";
+import type { Channel, VoiceParticipant } from "@sr/protocol";
 import { cn } from "@/lib/cn";
 import { fa } from "@/lib/fmt";
 import { Avatar } from "@/components/ui/Avatar";
@@ -13,6 +13,9 @@ import { VoiceStatus } from "@/components/shell/VoiceStatus";
 import { useApp } from "@/store/use-app";
 import { useVoice } from "@/store/use-voice";
 import { SERVER_URL } from "@/lib/config";
+
+/** مرجع ثابت تا سلکتور zustand هر رندر آرایه‌ی تازه نسازد. */
+const EMPTY_PARTICIPANTS: VoiceParticipant[] = [];
 
 export function ChannelSidebar() {
   const categories = useApp((s) => s.categories);
@@ -126,7 +129,7 @@ function ChannelRow({
   onSelect: () => void;
 }) {
   const Icon = channel.type === "text" ? Hash : channel.type === "stage" ? Radio : Volume2;
-  const participants = useApp((s) => s.voice[channel.id] ?? []);
+  const participants = useApp((s) => s.voice[channel.id] ?? EMPTY_PARTICIPANTS);
   const unread = useApp((s) => s.unread[channel.id]);
   const speaking = useVoice((s) => s.speaking);
   const join = useVoice((s) => s.join);

@@ -22,7 +22,17 @@ export default defineConfig({
     trace: "on-first-retry",
     screenshot: "only-on-failure",
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    // یک بار لاگین می‌کنیم و نشست را ذخیره می‌کنیم؛ بقیه‌ی تست‌ها از همان استفاده
+    // می‌کنند تا به سقف نرخِ لاگین (۸ در دقیقه) نخوریم.
+    { name: "setup", testMatch: /auth\.setup\.ts/ },
+    {
+      name: "chromium",
+      dependencies: ["setup"],
+      testIgnore: /auth\.setup\.ts/,
+      use: { ...devices["Desktop Chrome"], storageState: "tests/e2e/.auth/user.json" },
+    },
+  ],
   webServer: process.env.E2E_BASE_URL
     ? undefined
     : {

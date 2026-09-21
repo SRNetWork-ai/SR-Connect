@@ -1,22 +1,20 @@
 import { expect, test, type Page } from "@playwright/test";
 
-const USERNAME = process.env.E2E_USERNAME ?? "e2e";
-const PASSWORD = process.env.E2E_PASSWORD ?? "E2e-passw0rd!";
-
-async function signIn(page: Page) {
-  await page.goto("/login");
-  await page.getByLabel("ایمیل یا نام کاربری").fill(USERNAME);
-  await page.getByLabel("گذرواژه").fill(PASSWORD);
-  await page.getByRole("button", { name: /ورود/ }).click();
-  await page.waitForURL(/\/app/, { timeout: 45_000 });
+/** باز کردن اپ با نشستِ از پیش ذخیره‌شده (auth.setup.ts). */
+async function openApp(page: Page) {
+  await page.goto("/app");
   await expect(page.getByTestId("composer")).toBeVisible();
 }
 
-async function send(page: Page, text: string) {
+/**
+ * پیام را می‌فرستد و ردیف آن را برمی‌گرداند.
+ * `match` برای پیام‌های مارک‌داونی لازم است، چون متن رندرشده با متن خام فرق دارد.
+ */
+async function send(page: Page, text: string, match: string = text) {
   const composer = page.getByTestId("composer");
   await composer.fill(text);
   await composer.press("Enter");
-  const row = page.getByTestId("message").filter({ hasText: text }).last();
+  const row = page.getByTestId("message").filter({ hasText: match }).last();
   await expect(row).toBeVisible();
   return row;
 }
@@ -34,13 +32,12 @@ test.describe("جریان اصلی SR-Connect", () => {
   });
 
   test("ورود و ارسال پیام", async ({ page }) => {
-    await signIn(page);
-    const text = `پیام تست ${Date.now()}`;
-    await send(page, text);
+    await openApp(page);
+    await send(page, `پیام تست ${Date.now()}`);
   });
 
   test("ری‌اکشن اضافه و کم می‌شود", async ({ page }) => {
-    await signIn(page);
+    await openApp(page);
     const row = await send(page, `ری‌اکشن ${Date.now()}`);
 
     await row.hover();
@@ -52,13 +49,15 @@ test.describe("جریان اصلی SR-Connect", () => {
   });
 
   test("ویرایش پیام برچسب ویرایش‌شده می‌گیرد", async ({ page }) => {
-    await signIn(page);
+    await openApp(page);
     const stamp = Date.now();
     const row = await send(page, `قبل از ویرایش ${stamp}`);
 
     await row.hover();
     await row.getByTestId("msg-edit").click();
-    const box = row.getByTestId("edit-box");
+    // لوکیتور را سطح صفحه می‌گیریم؛ بعد از fill متنِ ردیف عوض می‌شود و فیلتر hasText دیگر نمی‌گیرد.
+    const box = page.getByTestId("edit-box");
+    await expect(box).toBeVisible();
     await box.fill(`بعد از ویرایش ${stamp}`);
     await box.press("Enter");
 
@@ -69,7 +68,7 @@ test.describe("جریان اصلی SR-Connect", () => {
   });
 
   test("پاسخ به پیام پیش‌نمایش می‌سازد", async ({ page }) => {
-    await signIn(page);
+    await openApp(page);
     const stamp = Date.now();
     const row = await send(page, `اصل پیام ${stamp}`);
 
@@ -82,15 +81,16 @@ test.describe("جریان اصلی SR-Connect", () => {
   });
 
   test("مارک‌داون رندر می‌شود", async ({ page }) => {
-    await signIn(page);
+    await openApp(page);
     const stamp = Date.now();
-    await send(page, `**پررنگ${stamp}** و \`کد${stamp}\``);
-    await expect(page.locator("strong", { hasText: `پررنگ${stamp}` })).toBeVisible();
-    await expect(page.locator("code", { hasText: `کد${stamp}` })).toBeVisible();
+    await send(page, `**پررنگ${stamp}** و \`کد${stamp}\``, `پررنگ${stamp}`);
+    // last() چون موقع جایگزینی پیام خوش‌بینانه با پیام سرور، لحظه‌ای هر دو در DOM هستند.
+    await expect(page.locator("strong", { hasText: `پررنگ${stamp}` }).last()).toBeVisible();
+    await expect(page.locator("code", { hasText: `کد${stamp}` }).last()).toBeVisible();
   });
 
   test("حذف پیام با تأیید", async ({ page }) => {
-    await signIn(page);
+    await openApp(page);
     const text = `حذف شود ${Date.now()}`;
     const row = await send(page, text);
 
@@ -98,5 +98,47 @@ test.describe("جریان اصلی SR-Connect", () => {
     await row.getByTestId("msg-delete").click();
     await page.getByTestId("confirm-delete").click();
     await expect(page.getByTestId("message").filter({ hasText: text })).toHaveCount(0);
+  });
+
+  /**
+   * محافظ رگرسیون: هر استثنای سمت کلاینت (حلقه‌ی بی‌نهایت رندر، hydration mismatch،
+   * چانک خراب) کل صفحه را سفید می‌کند. اینجا همه‌ی مسیرها را باز می‌کنیم و مطمئن
+   * می‌شویم هیچ خطای رانتایمی رخ نمی‌دهد.
+   */
+  test("هیچ مسیری استثنای سمت کلاینت ندارد", async ({ page }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (e) => errors.push(`${page.url()} → ${e.message}`));
+    const crash = page.getByText("Application error", { exact: false });
+
+    for (const path of ["/", "/app", "/app/settings", "/app/updates"]) {
+      await page.goto(path);
+      await page.waitForLoadState("domcontentloaded");
+      await page.waitForTimeout(1_500);
+      await expect(crash, `صفحه‌ی ${path} کرش کرد`).toHaveCount(0);
+    }
+
+    expect(errors, errors.join("\n")).toEqual([]);
+  });
+});
+
+/** صفحه‌های مهمان: بدون نشست باز می‌شوند و نباید کرش کنند. */
+test.describe("صفحه‌های مهمان", () => {
+  test.use({ storageState: { cookies: [], origins: [] } });
+
+  test("ورود و ثبت‌نام بدون خطای کلاینت باز می‌شوند", async ({ page }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (e) => errors.push(`${page.url()} → ${e.message}`));
+
+    for (const path of ["/", "/login", "/register"]) {
+      await page.goto(path);
+      await page.waitForLoadState("domcontentloaded");
+      await page.waitForTimeout(1_500);
+      await expect(
+        page.getByText("Application error", { exact: false }),
+        `صفحه‌ی ${path} کرش کرد`,
+      ).toHaveCount(0);
+    }
+
+    expect(errors, errors.join("\n")).toEqual([]);
   });
 });

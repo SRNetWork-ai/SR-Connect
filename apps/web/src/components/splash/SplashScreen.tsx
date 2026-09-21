@@ -14,7 +14,7 @@ import { StepRow } from "@/components/splash/StepRow";
 import { APP_VERSION, UPDATE_CHANNEL } from "@/lib/config";
 import { cn } from "@/lib/cn";
 import { fa } from "@/lib/fmt";
-import { PLATFORM_LABEL, detectPlatform } from "@/lib/platform";
+import { PLATFORM_LABEL, detectPlatform, type Platform } from "@/lib/platform";
 import { DECISION_LABEL, DEFER_REASON_LABEL, MANDATORY_REASON_LABEL } from "@/lib/updater/decide";
 import { relaunch } from "@/lib/updater/install";
 import { useUpdateFlow } from "@/lib/updater/use-update-flow";
@@ -39,6 +39,10 @@ export function SplashScreen({ theatrical = false }: { theatrical?: boolean }) {
       alive = false;
     };
   }, []);
+
+  // تشخیص بستر فقط بعد از mount؛ روی سرور navigator نداریم و hydration mismatch می‌دهد.
+  const [platform, setPlatform] = useState<Platform | null>(null);
+  useEffect(() => setPlatform(detectPlatform()), []);
 
   const flow = useUpdateFlow({ inCall, theatrical });
   const { steps, phase, decision, manifest, canEnter, bootAttempts, error } = flow;
@@ -78,7 +82,9 @@ export function SplashScreen({ theatrical = false }: { theatrical?: boolean }) {
           <span className="size-2.5 rounded-full bg-[#ff5f57]" />
           <span className="size-2.5 rounded-full bg-[#febc2e]" />
           <span className="size-2.5 rounded-full bg-[#28c840]" />
-          <span className="ms-auto text-2xs text-t5">{PLATFORM_LABEL[detectPlatform()]}</span>
+          <span className="ms-auto text-2xs text-t5">
+            {platform ? PLATFORM_LABEL[platform] : ""}
+          </span>
         </div>
 
         <div className="px-7 pt-7 pb-6">

@@ -12,6 +12,13 @@ import { useApp } from "@/store/use-app";
 
 const day = new Intl.DateTimeFormat("fa-IR", { dateStyle: "long" });
 
+/**
+ * مرجع ثابت برای حالت «کانال خالی».
+ * اگر سلکتور هر بار آرایه‌ی تازه بسازد، useSyncExternalStore بی‌نهایت رندر می‌کند
+ * و کل اپ با خطای «Maximum update depth exceeded» سفید می‌شود.
+ */
+const EMPTY_MESSAGES: ChatMessage[] = [];
+
 /** پیام‌های پشت‌سرهم از یک نفر در بازه‌ی ۵ دقیقه، فشرده نمایش داده می‌شوند. */
 function isCompact(prev: ChatMessage | undefined, m: ChatMessage): boolean {
   if (!prev || prev.author.id !== m.author.id) return false;
@@ -22,7 +29,9 @@ function isCompact(prev: ChatMessage | undefined, m: ChatMessage): boolean {
 
 export function MessageList() {
   const channelId = useApp((s) => s.activeChannelId);
-  const messages = useApp((s) => (s.activeChannelId ? (s.messages[s.activeChannelId] ?? []) : []));
+  const messages = useApp((s) =>
+    s.activeChannelId ? (s.messages[s.activeChannelId] ?? EMPTY_MESSAGES) : EMPTY_MESSAGES,
+  );
   const hasMore = useApp((s) =>
     s.activeChannelId ? Boolean(s.hasMore[s.activeChannelId]) : false,
   );
