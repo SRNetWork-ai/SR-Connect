@@ -20,10 +20,16 @@ export function GET(_req: Request, ctx: { params: Promise<{ name: string }> }) {
     const safe = basename(name);
     if (safe !== name || safe.includes("..")) throw new HttpError(400, "نام فایل نامعتبر است");
 
-    const row = await one<{ filename: string; mime: string }>(
-      `select filename, mime from attachments where path = $1`,
-      [safe],
-    );
+    // پیوست پیام یا ایموجی/استیکر سرور؛ هر دو در همان پوشه‌ی آپلود می‌نشینند.
+    const row =
+      (await one<{ filename: string; mime: string }>(
+        `select filename, mime from attachments where path = $1`,
+        [safe],
+      )) ??
+      (await one<{ filename: string; mime: string }>(
+        `select name as filename, mime from server_emojis where path = $1`,
+        [safe],
+      ));
     if (!row) throw new HttpError(404, "فایل پیدا نشد");
 
     const full = join(UPLOADS_DIR, safe);

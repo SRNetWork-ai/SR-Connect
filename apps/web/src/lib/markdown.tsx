@@ -2,6 +2,7 @@
 
 import { Fragment, useState, type ReactNode } from "react";
 import { isJumbo, toBlocks, tokenize, type Token } from "@/lib/markdown-parse";
+import { useEmojis } from "@/store/use-emojis";
 
 /**
  * مارک‌داون سبک، بدون dangerouslySetInnerHTML.
@@ -35,12 +36,39 @@ function Spoiler({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * متن ساده را با ایموجی‌های اختصاصی سرور جایگزین می‌کند: `:name:` → تصویر.
+ * اگر نامی در فهرست سرور نباشد، دقیقاً همان متن باقی می‌ماند.
+ */
+function withCustomEmoji(value: string, key: string): ReactNode {
+  if (!value.includes(":")) return value;
+  const map = useEmojis.getState().byName;
+  if (!Object.keys(map).length) return value;
+  const parts = value.split(/:([a-z0-9_]{2,32}):/gi);
+  if (parts.length === 1) return value;
+  return parts.map((part, index) => {
+    const url = index % 2 === 1 ? map[part.toLowerCase()] : undefined;
+    if (!url)
+      return <Fragment key={`${key}-e${index}`}>{index % 2 === 1 ? `:${part}:` : part}</Fragment>;
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        key={`${key}-e${index}`}
+        src={url}
+        alt={`:${part}:`}
+        title={`:${part}:`}
+        className="md-custom-emoji inline-block size-[1.375em] align-[-0.3em] object-contain"
+      />
+    );
+  });
+}
+
 function render(tokens: Token[], opts: MarkdownOptions, key: string): ReactNode[] {
   return tokens.map((tk, i) => {
     const k = `${key}-${i}`;
     switch (tk.t) {
       case "text":
-        return <Fragment key={k}>{tk.value}</Fragment>;
+        return <Fragment key={k}>{withCustomEmoji(tk.value, k)}</Fragment>;
       case "code":
         return (
           <code key={k} className="md-inline-code">

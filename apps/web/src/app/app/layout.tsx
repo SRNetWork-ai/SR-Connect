@@ -3,6 +3,8 @@ import { ChannelSidebar } from "@/components/shell/ChannelSidebar";
 import { ScreenShareView } from "@/components/shell/ScreenShareView";
 import { UpdateBanner } from "@/components/shell/UpdateBanner";
 import { AuthGate } from "@/components/shell/AuthGate";
+import { CallOverlay } from "@/components/shell/CallOverlay";
+import { WelcomeGate } from "@/components/shell/WelcomeGate";
 import { Toasts } from "@/components/ui/Toasts";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -17,6 +19,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           {children}
         </main>
       </div>
+      <CallOverlay />
+      <WelcomeGate />
       <Toasts />
     </AuthGate>
   );

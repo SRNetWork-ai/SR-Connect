@@ -32,6 +32,7 @@ import { Menu } from "@/components/ui/Menu";
 import { springSnappy, tapSoft } from "@/lib/motion";
 import { useShell } from "@/store/use-shell";
 import { SERVER_URL } from "@/lib/config";
+import { ServerMemberDialogs, type ServerDialog } from "@/components/shell/ServerMemberDialogs";
 
 /** مرجع ثابت تا سلکتور zustand هر رندر آرایه‌ی تازه نسازد. */
 const EMPTY_PARTICIPANTS: VoiceParticipant[] = [];
@@ -46,6 +47,7 @@ export function ChannelSidebar() {
   const pushToast = useApp((s) => s.pushToast);
   const isAdmin = useApp((s) => Boolean(s.me?.isAdmin));
   const setView = useShell((s) => s.setView);
+  const [dialog, setDialog] = useState<ServerDialog>(null);
   const serverMenu = isAdmin
     ? [
         {
@@ -56,22 +58,22 @@ export function ChannelSidebar() {
         {
           label: "اینوایت سرور",
           icon: <Link2 className="size-4" />,
-          onSelect: () => setView("serverSettings"),
+          onSelect: () => setView("serverSettings", { tab: "invites" }),
         },
         {
           label: "تنظیمات سرور",
           icon: <Settings className="size-4" />,
-          onSelect: () => setView("serverSettings"),
+          onSelect: () => setView("serverSettings", { tab: "profile" }),
         },
         {
           label: "تنظیمات اعلان",
           icon: <Bell className="size-4" />,
-          onSelect: () => pushToast("تنظیمات اعلان سرور به‌زودی فعال می‌شود", "info" as const),
+          onSelect: () => setDialog("notifications"),
         },
         {
           label: "گزارش",
           icon: <Flag className="size-4" />,
-          onSelect: () => setView("serverSettings"),
+          onSelect: () => setView("serverSettings", { tab: "reports" }),
         },
       ]
     : [
@@ -83,19 +85,19 @@ export function ChannelSidebar() {
         {
           label: "تنظیمات اعلان",
           icon: <Bell className="size-4" />,
-          onSelect: () => pushToast("تنظیمات اعلان سرور به‌زودی فعال می‌شود", "info" as const),
+          onSelect: () => setDialog("notifications"),
         },
         {
           label: "گزارش سرور",
           icon: <Flag className="size-4" />,
-          onSelect: () => pushToast("گزارش برای بررسی ثبت می‌شود", "info" as const),
+          onSelect: () => setDialog("report"),
         },
         {
           label: "ترک سرور",
           icon: <UserMinus className="size-4" />,
           danger: true,
           separated: true,
-          onSelect: () => pushToast("ترک سرور نیاز به تأیید نهایی دارد", "warning" as const),
+          onSelect: () => setDialog("leave"),
         },
       ];
 
@@ -118,6 +120,7 @@ export function ChannelSidebar() {
 
   return (
     <div className="bg-sidebar-deep flex w-[252px] shrink-0 flex-col">
+      <ServerMemberDialogs dialog={dialog} onClose={() => setDialog(null)} />
       {/* سرصفحه‌ی سرور — منوی واقعی، نه دکمه‌ی تزئینی */}
       <Menu
         label="منوی سرور"

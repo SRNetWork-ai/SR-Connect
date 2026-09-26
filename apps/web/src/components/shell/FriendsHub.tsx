@@ -18,6 +18,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import { useApp, type Member } from "@/store/use-app";
+import { useCall } from "@/store/use-call";
 
 type FriendFilter = "online" | "all";
 interface Friendship {
@@ -309,13 +310,33 @@ export function FriendsHub() {
               <div className="ms-auto flex gap-1">
                 <Action
                   label="تماس خصوصی"
-                  onClick={() => pushToast("تماس خصوصی در مرحله‌ی بعد فعال می‌شود", "info")}
+                  onClick={() =>
+                    void useCall.getState().start(
+                      {
+                        id: selected.user.id,
+                        displayName: selected.user.displayName,
+                        avatarColor: selected.user.avatarColor,
+                        avatarUrl: selected.user.avatarUrl,
+                      },
+                      false,
+                    )
+                  }
                 >
                   <Phone className="size-4" />
                 </Action>
                 <Action
                   label="تماس تصویری"
-                  onClick={() => pushToast("تماس تصویری در مرحله‌ی بعد فعال می‌شود", "info")}
+                  onClick={() =>
+                    void useCall.getState().start(
+                      {
+                        id: selected.user.id,
+                        displayName: selected.user.displayName,
+                        avatarColor: selected.user.avatarColor,
+                        avatarUrl: selected.user.avatarUrl,
+                      },
+                      true,
+                    )
+                  }
                 >
                   <Video className="size-4" />
                 </Action>

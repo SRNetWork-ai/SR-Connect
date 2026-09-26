@@ -22,8 +22,11 @@ export const VIEW_TITLE: Record<ShellView, string> = {
 
 interface ShellState {
   view: ShellView;
+  /** تبی که پس از باز شدن تنظیمات سرور باید انتخاب شود. */
+  settingsTab: string | null;
   /** جابه‌جایی بین نماها بدون رفت‌وبرگشت به سرور. */
-  setView(view: ShellView, opts?: { replace?: boolean }): void;
+  setView(view: ShellView, opts?: { replace?: boolean; tab?: string }): void;
+  clearSettingsTab(): void;
 }
 
 /**
@@ -36,8 +39,14 @@ interface ShellState {
  */
 export const useShell = create<ShellState>()((set, get) => ({
   view: "chat",
+  settingsTab: null,
+
+  clearSettingsTab() {
+    set({ settingsTab: null });
+  },
 
   setView(view, opts) {
+    if (opts?.tab) set({ settingsTab: opts.tab });
     if (get().view === view) return;
     set({ view });
     if (typeof window === "undefined") return;

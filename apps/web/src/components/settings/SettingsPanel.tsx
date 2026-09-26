@@ -5,6 +5,7 @@ import {
   Camera,
   Ban,
   DatabaseBackup,
+  Flag,
   ImagePlus,
   Hash,
   Link2,
@@ -24,11 +25,19 @@ import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Field } from "@/components/ui/Input";
+import {
+  BackupTab,
+  DangerTab,
+  EmojiTab,
+  ReportsTab,
+  WelcomeTab,
+} from "@/components/settings/ServerTabs";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import { riseIn, springSnappy, tap } from "@/lib/motion";
 import { fa } from "@/lib/fmt";
 import { useApp } from "@/store/use-app";
+import { useShell } from "@/store/use-shell";
 
 interface Role {
   id: string;
@@ -57,6 +66,7 @@ type Tab =
   | "roles"
   | "invites"
   | "audit"
+  | "reports"
   | "bans"
   | "welcome"
   | "backup"
@@ -68,6 +78,15 @@ export function SettingsPanel() {
   const categories = useApp((s) => s.categories);
   const refreshChannels = useApp((s) => s.refreshChannels);
   const [tab, setTab] = useState<Tab>("profile");
+  const requestedTab = useShell((s) => s.settingsTab);
+  const clearSettingsTab = useShell((s) => s.clearSettingsTab);
+
+  // ورود از منوی سرور می‌تواند مستقیم روی یک تب باز شود (مثلاً «گزارش»).
+  useEffect(() => {
+    if (!requestedTab) return;
+    setTab(requestedTab as Tab);
+    clearSettingsTab();
+  }, [requestedTab, clearSettingsTab]);
   const [error, setError] = useState<string | null>(null);
 
   const canManageChannels = me ? me.isAdmin || has(me.permissions, "MANAGE_CHANNELS") : false;
@@ -100,6 +119,7 @@ export function SettingsPanel() {
               ["roles", "نقش‌ها و دسترسی", Users],
               ["invites", "دعوت‌نامه‌ها", Link2],
               ["audit", "گزارش فعالیت", ScrollText],
+              ["reports", "گزارش‌های دریافتی", Flag],
               ["bans", "لیست بن", Ban],
               ["welcome", "ولکام اسکرین", Waves],
               ["backup", "بکاپ", DatabaseBackup],
@@ -157,12 +177,13 @@ export function SettingsPanel() {
             {tab === "roles" && <RolesTab canManage={canManageRoles} onError={onError} />}
             {tab === "invites" && <InvitesTab canManage={canInvite} onError={onError} />}
             {tab === "audit" && <AuditTab canManage={canAudit} onError={onError} />}
-            {tab === "emoji" && <ServerFeature title="ایموجی و استیکر اختصاصی" />}
+            {tab === "reports" && <ReportsTab onError={onError} />}
+            {tab === "emoji" && <EmojiTab onError={onError} />}
             {tab === "members" && <MembersTab onError={onError} />}
             {tab === "bans" && <BansTab onError={onError} />}
-            {tab === "welcome" && <ServerFeature title="ولکام اسکرین" />}
-            {tab === "backup" && <ServerFeature title="بکاپ و بازیابی سرور" />}
-            {tab === "danger" && <ServerFeature title="حذف سرور" danger />}
+            {tab === "welcome" && <WelcomeTab onError={onError} />}
+            {tab === "backup" && <BackupTab onError={onError} />}
+            {tab === "danger" && <DangerTab onError={onError} />}
           </motion.div>
         </AnimatePresence>
       </div>
@@ -365,17 +386,6 @@ function BansTab({ onError }: { onError: (error: string | null) => void }) {
         ))}
         {!bans.length && <li className="py-4 text-center text-sm text-t4">لیست بن خالی است.</li>}
       </ul>
-    </section>
-  );
-}
-
-function ServerFeature({ title, danger = false }: { title: string; danger?: boolean }) {
-  return (
-    <section className={cn("rounded-lg bg-card p-6", danger && "border border-danger/30")}>
-      <h2 className={cn("text-base font-black", danger ? "text-danger" : "text-t1")}>{title}</h2>
-      <p className="mt-2 text-sm text-t4">
-        رابط این بخش آماده شده؛ عملیات حساس آن پس از اضافه‌شدن API و تأیید امنیتی فعال می‌شود.
-      </p>
     </section>
   );
 }
