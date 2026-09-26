@@ -33,6 +33,27 @@ export function LoginForm() {
   const [errors, setErrors] = useState<{ identity?: string; password?: string; form?: string }>({});
   const [reach, setReach] = useState<Reach>("checking");
 
+  /**
+   * اگر واقعاً نشست معتبری داریم، مستقیم به اپ برویم.
+   * این تصمیم عمداً اینجاست و نه در میدل‌ور: لبه فقط وجود کوکی را می‌بیند و
+   * کوکیِ باطل باعث حلقه‌ی بی‌نهایت بین /app و /login می‌شد. اینجا اعتبار
+   * واقعی از سرور پرسیده می‌شود.
+   */
+  useEffect(() => {
+    let alive = true;
+    void api
+      .get("/api/auth/me")
+      .then(() => {
+        if (alive) router.replace(params.get("next") || "/app");
+      })
+      .catch(() => {
+        // ۴۰۱ یعنی همین‌جا بمان و فرم ورود را نشان بده.
+      });
+    return () => {
+      alive = false;
+    };
+  }, [router, params]);
+
   // آیا سرور خودی جواب می‌دهد؟ قبل از تلاش برای ورود بدانیم.
   useEffect(() => {
     let alive = true;

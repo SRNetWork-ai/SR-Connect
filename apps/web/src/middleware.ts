@@ -31,9 +31,13 @@ function csp(nonce: string): string {
 }
 
 /**
- * نگهبان لبه: مسیرهای /app بدون کوکی نشست مستقیم به صفحه‌ی ورود می‌روند،
- * و کاربر واردشده با باز کردن /login به اپ برمی‌گردد.
- * اعتبار واقعی توکن سمت سرور بررسی می‌شود؛ این فقط جلوی پرش صفحه را می‌گیرد.
+ * نگهبان لبه: مسیرهای /app بدون کوکی نشست مستقیم به صفحه‌ی ورود می‌روند.
+ *
+ * چرا برعکسش را انجام نمی‌دهیم: میدل‌ور فقط «وجود کوکی» را می‌بیند، نه معتبر
+ * بودنش. اگر کوکی مانده باشد ولی نشست در دیتابیس باطل شده باشد، هدایتِ
+ * /login → /app یک حلقه‌ی بی‌نهایت می‌سازد: اپ ۴۰۱ می‌گیرد و به /login
+ * می‌رود، لبه دوباره به /app برش می‌گرداند. پس تصمیمِ «قبلاً واردی» را به
+ * خود صفحه‌ی ورود می‌سپاریم که با /api/auth/me اعتبار واقعی را می‌پرسد.
  */
 export function middleware(req: NextRequest) {
   const hasSession = Boolean(req.cookies.get(SESSION_COOKIE)?.value);
@@ -43,13 +47,6 @@ export function middleware(req: NextRequest) {
     const url = req.nextUrl.clone();
     url.pathname = "/login";
     url.search = `?next=${encodeURIComponent(pathname + search)}`;
-    return NextResponse.redirect(url);
-  }
-
-  if ((pathname === "/login" || pathname === "/register") && hasSession) {
-    const url = req.nextUrl.clone();
-    url.pathname = "/app";
-    url.search = "";
     return NextResponse.redirect(url);
   }
 
