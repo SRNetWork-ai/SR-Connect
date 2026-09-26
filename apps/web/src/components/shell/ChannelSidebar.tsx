@@ -2,9 +2,11 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  Bell,
   ChevronDown,
   Copy,
   Download,
+  Flag,
   Hash,
   HeadphoneOff,
   Link2,
@@ -12,6 +14,8 @@ import {
   MicOff,
   Radio,
   Settings,
+  Star,
+  UserMinus,
   Volume2,
 } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -42,6 +46,58 @@ export function ChannelSidebar() {
   const pushToast = useApp((s) => s.pushToast);
   const isAdmin = useApp((s) => Boolean(s.me?.isAdmin));
   const setView = useShell((s) => s.setView);
+  const serverMenu = isAdmin
+    ? [
+        {
+          label: "ویش سرور",
+          icon: <Star className="size-4" />,
+          onSelect: () => pushToast("ویش سرور به‌زودی فعال می‌شود", "info" as const),
+        },
+        {
+          label: "اینوایت سرور",
+          icon: <Link2 className="size-4" />,
+          onSelect: () => setView("serverSettings"),
+        },
+        {
+          label: "تنظیمات سرور",
+          icon: <Settings className="size-4" />,
+          onSelect: () => setView("serverSettings"),
+        },
+        {
+          label: "تنظیمات اعلان",
+          icon: <Bell className="size-4" />,
+          onSelect: () => pushToast("تنظیمات اعلان سرور به‌زودی فعال می‌شود", "info" as const),
+        },
+        {
+          label: "گزارش",
+          icon: <Flag className="size-4" />,
+          onSelect: () => setView("serverSettings"),
+        },
+      ]
+    : [
+        {
+          label: "ویش سرور",
+          icon: <Star className="size-4" />,
+          onSelect: () => pushToast("ویش سرور به‌زودی فعال می‌شود", "info" as const),
+        },
+        {
+          label: "تنظیمات اعلان",
+          icon: <Bell className="size-4" />,
+          onSelect: () => pushToast("تنظیمات اعلان سرور به‌زودی فعال می‌شود", "info" as const),
+        },
+        {
+          label: "گزارش سرور",
+          icon: <Flag className="size-4" />,
+          onSelect: () => pushToast("گزارش برای بررسی ثبت می‌شود", "info" as const),
+        },
+        {
+          label: "ترک سرور",
+          icon: <UserMinus className="size-4" />,
+          danger: true,
+          separated: true,
+          onSelect: () => pushToast("ترک سرور نیاز به تأیید نهایی دارد", "warning" as const),
+        },
+      ];
 
   const groups = useMemo(() => {
     const ordered = [...categories].sort((a, b) => a.position - b.position);
@@ -68,6 +124,7 @@ export function ChannelSidebar() {
         align="start"
         className="shadow-line"
         items={[
+          ...serverMenu,
           {
             label: "کپی لینک سرور",
             icon: <Link2 className="size-4" />,
@@ -83,11 +140,6 @@ export function ChannelSidebar() {
             icon: <Download className="size-4" />,
             separated: true,
             onSelect: () => setView("updates"),
-          },
-          {
-            label: isAdmin ? "تنظیمات سرور و نقش‌ها" : "تنظیمات من",
-            icon: <Settings className="size-4" />,
-            onSelect: () => setView("settings"),
           },
         ]}
         trigger={({ open, toggle }) => (

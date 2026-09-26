@@ -139,7 +139,7 @@ export function VoiceStatus() {
             </Tooltip>
           ) : (
             <span className="tnum text-2xs whitespace-nowrap text-t4">
-              {connected ? `${ping !== null ? `${fa(ping)} م‌ث · ` : ""}اوپوس ۳۲ک` : "—"}
+              {connected ? `${ping !== null ? `${fa(ping)} م‌ث · ` : "سنجش… · "}اوپوس ۳۲ک` : "—"}
             </span>
           )}
         </span>

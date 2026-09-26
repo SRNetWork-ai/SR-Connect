@@ -3,6 +3,9 @@
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Camera,
+  Ban,
+  DatabaseBackup,
+  ImagePlus,
   Hash,
   Link2,
   Plus,
@@ -12,6 +15,7 @@ import {
   UserRound,
   Users,
   Volume2,
+  Waves,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { AuditEntry, Category, Channel } from "@sr/protocol";
@@ -43,7 +47,18 @@ interface Invite {
   expiresAt: string | null;
 }
 
-type Tab = "profile" | "channels" | "roles" | "invites" | "audit";
+type Tab =
+  | "profile"
+  | "channels"
+  | "emoji"
+  | "members"
+  | "roles"
+  | "invites"
+  | "audit"
+  | "bans"
+  | "welcome"
+  | "backup"
+  | "danger";
 
 export function SettingsPanel() {
   const me = useApp((s) => s.me);
@@ -66,21 +81,27 @@ export function SettingsPanel() {
         <header className="flex items-center gap-3">
           <Shield className="size-6 text-brand" />
           <div>
-            <h1 className="text-xl font-bold text-t1">تنظیمات</h1>
+            <h1 className="text-xl font-bold text-t1">تنظیمات سرور</h1>
             <p className="text-sm text-t4">
-              پروفایل، کانال‌ها، نقش‌ها، دعوت‌نامه‌ها و گزارش فعالیت
+              پروفایل سرور، اعضا، نقش‌ها، دعوت‌نامه‌ها، گزارش و پشتیبان
             </p>
           </div>
         </header>
 
-        <nav className="flex gap-1.5">
+        <nav className="scroll-x flex gap-1.5 overflow-x-auto pb-1">
           {(
             [
-              ["profile", "پروفایل من", UserRound],
+              ["profile", "پروفایل سرور", UserRound],
               ["channels", "کانال‌ها", Hash],
+              ["emoji", "ایموجی و استیکر", ImagePlus],
+              ["members", "ممبرها", Users],
               ["roles", "نقش‌ها و دسترسی", Users],
               ["invites", "دعوت‌نامه‌ها", Link2],
               ["audit", "گزارش فعالیت", ScrollText],
+              ["bans", "لیست بن", Ban],
+              ["welcome", "ولکام اسکرین", Waves],
+              ["backup", "بکاپ", DatabaseBackup],
+              ["danger", "حذف سرور", Trash2],
             ] as const
           ).map(([id, label, Icon]) => (
             <motion.button
@@ -121,7 +142,7 @@ export function SettingsPanel() {
             exit="exit"
             className="space-y-5"
           >
-            {tab === "profile" && <ProfileTab />}
+            {tab === "profile" && <ServerFeature title="پروفایل سرور" />}
             {tab === "channels" && (
               <ChannelsTab
                 canManage={canManageChannels}
@@ -134,10 +155,27 @@ export function SettingsPanel() {
             {tab === "roles" && <RolesTab canManage={canManageRoles} onError={onError} />}
             {tab === "invites" && <InvitesTab canManage={canInvite} onError={onError} />}
             {tab === "audit" && <AuditTab canManage={canAudit} onError={onError} />}
+            {tab === "emoji" && <ServerFeature title="ایموجی و استیکر اختصاصی" />}
+            {tab === "members" && <ServerFeature title="مشاهده، جست‌وجو و مدیریت ممبرها" />}
+            {tab === "bans" && <ServerFeature title="لیست کاربران بن‌شده" />}
+            {tab === "welcome" && <ServerFeature title="ولکام اسکرین" />}
+            {tab === "backup" && <ServerFeature title="بکاپ و بازیابی سرور" />}
+            {tab === "danger" && <ServerFeature title="حذف سرور" danger />}
           </motion.div>
         </AnimatePresence>
       </div>
     </div>
+  );
+}
+
+function ServerFeature({ title, danger = false }: { title: string; danger?: boolean }) {
+  return (
+    <section className={cn("rounded-lg bg-card p-6", danger && "border border-danger/30")}>
+      <h2 className={cn("text-base font-black", danger ? "text-danger" : "text-t1")}>{title}</h2>
+      <p className="mt-2 text-sm text-t4">
+        رابط این بخش آماده شده؛ عملیات حساس آن پس از اضافه‌شدن API و تأیید امنیتی فعال می‌شود.
+      </p>
+    </section>
   );
 }
 

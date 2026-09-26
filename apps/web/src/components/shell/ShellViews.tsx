@@ -6,6 +6,8 @@ import { Composer } from "@/components/shell/Composer";
 import { MessageList } from "@/components/shell/MessageList";
 import { TopBar } from "@/components/shell/TopBar";
 import { SettingsPanel } from "@/components/settings/SettingsPanel";
+import { AccountSettingsPanel } from "@/components/settings/AccountSettingsPanel";
+import { FriendsHub } from "@/components/shell/FriendsHub";
 import { UpdateCenter } from "@/components/updates/UpdateCenter";
 import { viewSwap } from "@/lib/motion";
 import { useShell, viewFromPath, type ShellView } from "@/store/use-shell";
@@ -39,7 +41,9 @@ export function ShellViews({ initial }: { initial: ShellView }) {
         exit="exit"
         className="flex min-h-0 flex-1 flex-col"
       >
-        {view === "chat" ? (
+        {view === "friends" ? (
+          <FriendsHub />
+        ) : view === "chat" ? (
           <>
             <TopBar />
             <MessageList />
@@ -47,6 +51,8 @@ export function ShellViews({ initial }: { initial: ShellView }) {
           </>
         ) : view === "updates" ? (
           <UpdateCenter />
+        ) : view === "accountSettings" ? (
+          <AccountSettingsPanel />
         ) : (
           <SettingsPanel />
         )}

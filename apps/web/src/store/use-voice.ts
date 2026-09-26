@@ -72,6 +72,20 @@ function withTimeout<T>(p: Promise<T>, ms: number, message: string): Promise<T> 
   });
 }
 
+/** پینگ قابل‌نمایش حتی وقتی کاربر تنها عضو اتاق است و WebRTC آمار remote ندارد. */
+async function measureServerRtt(): Promise<number | null> {
+  const started = performance.now();
+  try {
+    await fetch(`/api/health?voicePing=${Date.now()}`, {
+      cache: "no-store",
+      credentials: "same-origin",
+    });
+    return Math.max(1, Math.round(performance.now() - started));
+  } catch {
+    return null;
+  }
+}
+
 export const useVoice = create<VoiceState>()((set, get) => ({
   status: "idle",
   channelId: null,
@@ -153,6 +167,10 @@ export const useVoice = create<VoiceState>()((set, get) => ({
         }
       });
       r.on(RoomEvent.Disconnected, () => {
+        if (statsTimer) {
+          clearInterval(statsTimer);
+          statsTimer = null;
+        }
         useSession.getState().setInCall(false);
         set({
           status: "idle",
@@ -215,22 +233,29 @@ export const useVoice = create<VoiceState>()((set, get) => ({
         .publishVoiceState({ channelId, muted: !auth.canSpeak, deafened: get().deafened });
 
       // تأخیر واقعی را از گزارش WebRTC می‌خوانیم، نه عدد ساختگی.
-      statsTimer = setInterval(async () => {
+      const updatePing = async () => {
         const first = [...r.remoteParticipants.values()][0];
         const pub = first ? [...first.audioTrackPublications.values()][0] : undefined;
         const stats = await pub?.track?.getRTCStatsReport?.().catch(() => null);
-        if (!stats) return;
         let rtt: number | null = null;
-        stats.forEach((report) => {
+        stats?.forEach((report) => {
           const rec = report as { type?: string; roundTripTime?: number };
           if (rec.type === "remote-inbound-rtp" && typeof rec.roundTripTime === "number") {
             rtt = Math.round(rec.roundTripTime * 1000);
           }
         });
+        // بدون remote participant، RTT سرویس اصلی را نشان می‌دهیم؛ دیگر «—» نمی‌ماند.
+        if (rtt === null) rtt = await measureServerRtt();
         if (rtt !== null) set({ ping: rtt });
-      }, 5_000);
+      };
+      void updatePing();
+      statsTimer = setInterval(() => void updatePing(), 5_000);
     } catch (err) {
       if (!alive()) return;
+      if (statsTimer) {
+        clearInterval(statsTimer);
+        statsTimer = null;
+      }
       const message = (err as Error).message || "اتصال صدا برقرار نشد";
       if (room) {
         void room.disconnect().catch(() => {});
