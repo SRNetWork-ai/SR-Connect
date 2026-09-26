@@ -102,10 +102,11 @@ export function POST(req: Request) {
         }
       }
       if (usedInviteCode) {
-        await c.query(`insert into invite_join_log (invite_code, user_id) values ($1, $2)`, [
-          usedInviteCode,
-          id,
-        ]);
+        await c.query(
+          `insert into invite_join_log (invite_code, user_id)
+           select $1, $2 where to_regclass('public.invite_join_log') is not null`,
+          [usedInviteCode, id],
+        );
       }
       return id;
     });
