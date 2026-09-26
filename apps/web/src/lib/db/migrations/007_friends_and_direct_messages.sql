@@ -53,3 +53,12 @@ create table if not exists server_bans (
   reason     text,
   created_at timestamptz not null default now()
 );
+
+create table if not exists invite_join_log (
+  id         bigserial primary key,
+  invite_code text not null,
+  user_id    uuid references users(id) on delete set null,
+  joined_at  timestamptz not null default now()
+);
+create index if not exists invite_join_log_code_idx
+  on invite_join_log(invite_code, joined_at desc);

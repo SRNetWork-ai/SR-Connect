@@ -45,6 +45,8 @@ interface Invite {
   uses: number;
   maxUses: number;
   expiresAt: string | null;
+  createdBy?: string | null;
+  recentJoins?: { displayName: string | null; joinedAt: string }[];
 }
 
 type Tab =
@@ -645,6 +647,15 @@ function InvitesTab({
     }
   }
 
+  async function revoke(code: string) {
+    try {
+      await api.del(`/api/invites?code=${encodeURIComponent(code)}`);
+      setInvites((items) => items.filter((invite) => invite.code !== code));
+    } catch (err) {
+      onError((err as Error).message);
+    }
+  }
+
   return (
     <section className="rounded-lg bg-card p-5">
       <div className="flex items-center gap-3">
@@ -673,6 +684,10 @@ function InvitesTab({
             <span className="tnum ms-auto text-xs text-t4">
               {fa(i.uses)}/{i.maxUses ? fa(i.maxUses) : "∞"}
             </span>
+            {i.createdBy && <span className="text-2xs text-t5">سازنده: {i.createdBy}</span>}
+            <button onClick={() => void revoke(i.code)} className="text-xs text-danger">
+              ریووک
+            </button>
           </li>
         ))}
         {invites.length === 0 && (
