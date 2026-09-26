@@ -69,10 +69,68 @@ export function AccountSettingsPanel() {
       </aside>
       <main className="scroll-y flex-1 p-7">
         <div className="mx-auto max-w-[720px]">
-          {tab === "account" ? <AccountInfo /> : <AccountSection tab={tab} />}
+          {tab === "account" ? (
+            <AccountInfo />
+          ) : tab === "voice" ? (
+            <VoiceSettings />
+          ) : (
+            <AccountSection tab={tab} />
+          )}
         </div>
       </main>
     </div>
+  );
+}
+
+function VoiceSettings() {
+  const enabled = useVoice((s) => s.noiseCancellation);
+  const active = useVoice((s) => s.noiseFilterActive);
+  const connected = useVoice((s) => s.status === "connected");
+  const toggle = useVoice((s) => s.toggleNoiseCancellation);
+
+  return (
+    <section>
+      <h2 className="text-xl font-black text-t1">ویس و ویدیو</h2>
+      <div className="mt-5 rounded-xl bg-card p-5">
+        <div className="flex items-center gap-4">
+          <span className="grid size-11 place-items-center rounded-lg bg-brand-soft text-brand">
+            <WandSparkles className="size-5" />
+          </span>
+          <span className="flex-1">
+            <strong className="block text-t1">نویزگیر هوشمند Krisp</strong>
+            <span className="mt-1 block text-xs leading-6 text-t4">
+              صدای فن، کیبورد و نویز محیط قبل از ارسال میکروفون حذف می‌شود.
+            </span>
+            {connected && enabled && (
+              <span className={cn("text-2xs font-bold", active ? "text-success" : "text-warning")}>
+                {active ? "فعال روی میکروفون فعلی" : "در حال آماده‌سازی یا پشتیبانی‌نشده"}
+              </span>
+            )}
+          </span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={enabled}
+            onClick={() => void toggle()}
+            className={cn(
+              "relative h-7 w-12 shrink-0 rounded-pill transition-colors",
+              enabled ? "bg-success" : "bg-deep",
+            )}
+          >
+            <span
+              className={cn(
+                "absolute top-1 size-5 rounded-full bg-white shadow transition-[left,right]",
+                enabled ? "end-1" : "start-1",
+              )}
+            />
+          </button>
+        </div>
+        <p className="mt-4 border-t border-divider pt-4 text-xs leading-6 text-t5">
+          فیلتر استاندارد مرورگر نیز فعال می‌ماند. انتخاب شما روی همین دستگاه ذخیره می‌شود و در
+          تماس‌های بعدی به‌صورت خودکار اعمال خواهد شد.
+        </p>
+      </div>
+    </section>
   );
 }
 
