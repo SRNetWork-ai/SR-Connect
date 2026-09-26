@@ -12,7 +12,7 @@ import type {
   ReadState,
   VoiceParticipant,
 } from "@sr/protocol";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import { RealtimeSocket, type SocketStatus } from "@/lib/realtime/socket";
 
 export interface Member extends PublicUser {
@@ -48,6 +48,8 @@ export interface Unread {
 interface AppState {
   ready: boolean;
   error: string | null;
+  /** کد وضعیت خطای bootstrap؛ فقط ۴۰۱ یعنی نشست واقعاً نامعتبر است. */
+  errorStatus: number | null;
   socketStatus: SocketStatus;
   me: (PublicUser & { permissions: number }) | null;
   categories: Category[];
@@ -69,7 +71,7 @@ interface AppState {
   versionHint: { latest: string; mandatory: boolean; minClient: string } | null;
   socket: RealtimeSocket | null;
 
-  bootstrap(): Promise<void>;
+  bootstrap(opts?: { force?: boolean }): Promise<void>;
   teardown(): void;
   setActiveChannel(id: string): void;
   loadHistory(channelId: string, opts?: { older?: boolean }): Promise<void>;
@@ -130,6 +132,7 @@ function patchMessage(
 export const useApp = create<AppState>()((set, get) => ({
   ready: false,
   error: null,
+  errorStatus: null,
   socketStatus: "idle",
   me: null,
   categories: [],
@@ -151,8 +154,14 @@ export const useApp = create<AppState>()((set, get) => ({
   versionHint: null,
   socket: null,
 
-  async bootstrap() {
-    if (get().socket) return;
+  async bootstrap(opts) {
+    // تلاش دوباره باید واقعاً دوباره تلاش کند، نه اینکه پشت سوکت قدیمی بماند.
+    if (opts?.force) {
+      get().socket?.close();
+      set({ socket: null, error: null, errorStatus: null });
+    } else if (get().socket) {
+      return;
+    }
     try {
       const data = await api.get<Bootstrap>("/api/bootstrap");
       const firstText = data.channels.find((c) => c.type === "text") ?? data.channels[0];
@@ -160,6 +169,7 @@ export const useApp = create<AppState>()((set, get) => ({
       set({
         ready: true,
         error: null,
+        errorStatus: null,
         me: data.user,
         categories: data.categories,
         channels: data.channels,
@@ -291,7 +301,15 @@ export const useApp = create<AppState>()((set, get) => ({
       const active = get().activeChannelId;
       if (active) void get().loadHistory(active);
     } catch (err) {
-      set({ ready: false, error: (err as Error).message });
+      const status = err instanceof ApiError ? err.status : null;
+      set({
+        ready: false,
+        error:
+          status === 401
+            ? "نشست منقضی شده است."
+            : ((err as Error).message ?? "ارتباط با سرور برقرار نشد."),
+        errorStatus: status,
+      });
     }
   },
 

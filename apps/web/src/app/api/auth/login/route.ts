@@ -35,7 +35,12 @@ export function POST(req: Request) {
     // پاسخ یکسان برای «کاربر نیست» و «گذرواژه غلط» تا نام کاربری لو نرود.
     const ok = row ? await verifyPassword(password, row.password_hash) : false;
     if (!row || !ok) throw new HttpError(401, "نام کاربری یا گذرواژه درست نیست");
-    const banned = await one(`select 1 from server_bans where user_id = $1`, [row.id]);
+    // اگر مهاجرت جدول بن هنوز اجرا نشده باشد، ورود نباید کلاً بشکند.
+    const banned = await one(
+      `select 1 where to_regclass('public.server_bans') is not null
+         and exists (select 1 from server_bans where user_id = $1)`,
+      [row.id],
+    );
     if (banned) throw new HttpError(403, "این حساب از سرور بن شده است");
 
     const { token, expiresAt } = await createSession(row.id, {
