@@ -12,6 +12,7 @@ import {
   PhoneOff,
   RotateCcw,
   Signal,
+  Sparkles,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
@@ -36,6 +37,7 @@ export function VoiceStatus() {
   const ping = useVoice((s) => s.ping);
   const error = useVoice((s) => s.error);
   const phase = useVoice((s) => s.phase);
+  const noiseFilterActive = useVoice((s) => s.noiseFilterActive);
   const toggleMute = useVoice((s) => s.toggleMute);
   const toggleDeafen = useVoice((s) => s.toggleDeafen);
   const toggleScreenShare = useVoice((s) => s.toggleScreenShare);
@@ -108,6 +110,13 @@ export function VoiceStatus() {
         </AnimatePresence>
 
         <span className="ms-auto flex items-center gap-1.5">
+          {connected && noiseFilterActive && (
+            <Tooltip label="نویزگیر هوشمند فعال است">
+              <span className="grid size-5 place-items-center rounded-full bg-success-soft text-success">
+                <Sparkles className="size-3" />
+              </span>
+            </Tooltip>
+          )}
           {connected && (
             <Tooltip label={`کیفیت اتصال ${fa(quality)}/۳`}>
               <span className="flex items-end gap-0.5">
@@ -139,7 +148,7 @@ export function VoiceStatus() {
             </Tooltip>
           ) : (
             <span className="tnum text-2xs whitespace-nowrap text-t4">
-              {connected ? `${ping !== null ? `${fa(ping)} م‌ث · ` : ""}اوپوس ۳۲ک` : "—"}
+              {connected ? `${ping !== null ? `${fa(ping)} م‌ث · ` : "سنجش… · "}اوپوس ۳۲ک` : "—"}
             </span>
           )}
         </span>

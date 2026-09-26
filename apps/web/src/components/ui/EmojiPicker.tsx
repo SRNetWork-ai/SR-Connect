@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Search } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { useEmojis } from "@/store/use-emojis";
 
 /** مجموعه‌ی کوچک و دسته‌بندی‌شده — بدون دیتاست سنگین. */
 const GROUPS: { id: string; label: string; items: string[] }[] = [
@@ -65,6 +66,13 @@ export function EmojiPicker({
   const [query, setQuery] = useState("");
   const [group, setGroup] = useState(GROUPS[0]!.id);
   const ref = useRef<HTMLDivElement>(null);
+  const custom = useEmojis((s) => s.items);
+  const loadCustom = useEmojis((s) => s.load);
+
+  // فهرست ایموجی سرور فقط وقتی پیکر باز می‌شود گرفته می‌شود، یک‌بار برای کل نشست.
+  useEffect(() => {
+    if (open) void loadCustom();
+  }, [open, loadCustom]);
 
   useEffect(() => {
     if (!open) return;
@@ -82,13 +90,24 @@ export function EmojiPicker({
     };
   }, [open, onClose]);
 
+  const customEmojis = useMemo(() => custom.filter((item) => item.kind === "emoji"), [custom]);
+
+  const needle = query.trim().toLowerCase();
+  const customMatches = useMemo(
+    () =>
+      needle
+        ? customEmojis.filter((item) => item.name.includes(needle))
+        : group === "server"
+          ? customEmojis
+          : [],
+    [customEmojis, group, needle],
+  );
+
   const items = useMemo(() => {
-    if (query.trim()) {
-      const all = GROUPS.flatMap((g) => g.items);
-      return all.slice(0, 120);
-    }
+    if (needle) return GROUPS.flatMap((g) => g.items).slice(0, 120);
+    if (group === "server") return [];
     return GROUPS.find((g) => g.id === group)?.items ?? [];
-  }, [group, query]);
+  }, [group, needle]);
 
   return (
     <AnimatePresence>
@@ -116,6 +135,24 @@ export function EmojiPicker({
           </div>
 
           <div className="scroll-y grid max-h-[192px] grid-cols-8 gap-0.5">
+            {customMatches.map((item) => (
+              <motion.button
+                key={item.id}
+                type="button"
+                title={`:${item.name}:`}
+                whileHover={{ scale: 1.25 }}
+                whileTap={{ scale: 0.9 }}
+                transition={{ type: "spring", stiffness: 500, damping: 22 }}
+                onClick={() => {
+                  onPick(`:${item.name}:`);
+                  onClose();
+                }}
+                className="grid h-8 place-items-center rounded-[6px] hover:bg-hover"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={item.url} alt={item.name} className="size-6 object-contain" />
+              </motion.button>
+            ))}
             {items.map((emoji, i) => (
               <motion.button
                 key={`${emoji}-${i}`}
@@ -136,6 +173,24 @@ export function EmojiPicker({
 
           {!query.trim() && (
             <div className="mt-2 flex justify-between border-t border-divider pt-1.5">
+              {customEmojis.length > 0 && (
+                <button
+                  type="button"
+                  title="ایموجی سرور"
+                  onClick={() => setGroup("server")}
+                  className={cn(
+                    "grid size-8 place-items-center rounded-[6px] transition-colors",
+                    group === "server" ? "bg-brand-soft" : "hover:bg-hover",
+                  )}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={customEmojis[0]!.url}
+                    alt="ایموجی سرور"
+                    className="size-5 object-contain"
+                  />
+                </button>
+              )}
               {GROUPS.map((g) => (
                 <button
                   key={g.id}

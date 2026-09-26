@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
 import { one, q } from "@/lib/db/pool";
-import { handle, requirePermission } from "@/lib/auth/guard";
+import { handle, HttpError, requirePermission } from "@/lib/auth/guard";
 
 export const dynamic = "force-dynamic";
 
@@ -10,11 +10,30 @@ export function GET() {
     await requirePermission("CREATE_INVITE");
     const invites = await q(
       `select i.code, i.max_uses as "maxUses", i.uses, i.expires_at as "expiresAt",
-              i.created_at as "createdAt", u.display_name as "createdBy"
+              i.created_at as "createdAt", u.display_name as "createdBy",
+              coalesce((select json_agg(x order by x."joinedAt" desc) from (
+                select ju.display_name as "displayName", l.joined_at as "joinedAt"
+                  from invite_join_log l left join users ju on ju.id = l.user_id
+                 where l.invite_code = i.code order by l.joined_at desc limit 10
+              ) x), '[]'::json) as "recentJoins"
          from invites i left join users u on u.id = i.created_by
         order by i.created_at desc limit 50`,
     );
     return NextResponse.json({ invites });
+  });
+}
+
+export function DELETE(req: Request) {
+  return handle(async () => {
+    const user = await requirePermission("CREATE_INVITE");
+    const code = new URL(req.url).searchParams.get("code");
+    if (!code) throw new HttpError(400, "کد دعوت لازم است");
+    await q(`delete from invites where code = $1`, [code]);
+    await q(`insert into audit_log (actor_id, action, target) values ($1, 'invite.revoke', $2)`, [
+      user.id,
+      code,
+    ]);
+    return new NextResponse(null, { status: 204 });
   });
 }
 

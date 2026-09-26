@@ -35,6 +35,7 @@ export function POST(req: Request) {
     if (problems.length) throw new HttpError(400, `گذرواژه ضعیف است: ${problems.join(" · ")}`);
 
     let inviteRoleId: string | null = null;
+    let usedInviteCode: string | null = null;
     if (serverEnv.requireInvite) {
       const code = (body.invite ?? "").trim();
       const invite = await one<{
@@ -52,6 +53,7 @@ export function POST(req: Request) {
         throw new HttpError(400, "ظرفیت این دعوت‌نامه تمام شده است");
       }
       inviteRoleId = invite.role_id;
+      usedInviteCode = code;
       await q(`update invites set uses = uses + 1 where code = $1`, [code]);
     }
 
@@ -98,6 +100,12 @@ export function POST(req: Request) {
             [id, admin.id],
           );
         }
+      }
+      if (usedInviteCode) {
+        await c.query(`insert into invite_join_log (invite_code, user_id) values ($1, $2)`, [
+          usedInviteCode,
+          id,
+        ]);
       }
       return id;
     });

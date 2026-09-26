@@ -3,6 +3,10 @@
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Camera,
+  Ban,
+  DatabaseBackup,
+  Flag,
+  ImagePlus,
   Hash,
   Link2,
   Plus,
@@ -12,6 +16,7 @@ import {
   UserRound,
   Users,
   Volume2,
+  Waves,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { AuditEntry, Category, Channel } from "@sr/protocol";
@@ -20,11 +25,19 @@ import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Field } from "@/components/ui/Input";
+import {
+  BackupTab,
+  DangerTab,
+  EmojiTab,
+  ReportsTab,
+  WelcomeTab,
+} from "@/components/settings/ServerTabs";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import { riseIn, springSnappy, tap } from "@/lib/motion";
 import { fa } from "@/lib/fmt";
 import { useApp } from "@/store/use-app";
+import { useShell } from "@/store/use-shell";
 
 interface Role {
   id: string;
@@ -41,9 +54,23 @@ interface Invite {
   uses: number;
   maxUses: number;
   expiresAt: string | null;
+  createdBy?: string | null;
+  recentJoins?: { displayName: string | null; joinedAt: string }[];
 }
 
-type Tab = "profile" | "channels" | "roles" | "invites" | "audit";
+type Tab =
+  | "profile"
+  | "channels"
+  | "emoji"
+  | "members"
+  | "roles"
+  | "invites"
+  | "audit"
+  | "reports"
+  | "bans"
+  | "welcome"
+  | "backup"
+  | "danger";
 
 export function SettingsPanel() {
   const me = useApp((s) => s.me);
@@ -51,6 +78,15 @@ export function SettingsPanel() {
   const categories = useApp((s) => s.categories);
   const refreshChannels = useApp((s) => s.refreshChannels);
   const [tab, setTab] = useState<Tab>("profile");
+  const requestedTab = useShell((s) => s.settingsTab);
+  const clearSettingsTab = useShell((s) => s.clearSettingsTab);
+
+  // ورود از منوی سرور می‌تواند مستقیم روی یک تب باز شود (مثلاً «گزارش»).
+  useEffect(() => {
+    if (!requestedTab) return;
+    setTab(requestedTab as Tab);
+    clearSettingsTab();
+  }, [requestedTab, clearSettingsTab]);
   const [error, setError] = useState<string | null>(null);
 
   const canManageChannels = me ? me.isAdmin || has(me.permissions, "MANAGE_CHANNELS") : false;
@@ -66,21 +102,28 @@ export function SettingsPanel() {
         <header className="flex items-center gap-3">
           <Shield className="size-6 text-brand" />
           <div>
-            <h1 className="text-xl font-bold text-t1">تنظیمات</h1>
+            <h1 className="text-xl font-bold text-t1">تنظیمات سرور</h1>
             <p className="text-sm text-t4">
-              پروفایل، کانال‌ها، نقش‌ها، دعوت‌نامه‌ها و گزارش فعالیت
+              پروفایل سرور، اعضا، نقش‌ها، دعوت‌نامه‌ها، گزارش و پشتیبان
             </p>
           </div>
         </header>
 
-        <nav className="flex gap-1.5">
+        <nav className="scroll-x flex gap-1.5 overflow-x-auto pb-1">
           {(
             [
-              ["profile", "پروفایل من", UserRound],
+              ["profile", "پروفایل سرور", UserRound],
               ["channels", "کانال‌ها", Hash],
+              ["emoji", "ایموجی و استیکر", ImagePlus],
+              ["members", "ممبرها", Users],
               ["roles", "نقش‌ها و دسترسی", Users],
               ["invites", "دعوت‌نامه‌ها", Link2],
               ["audit", "گزارش فعالیت", ScrollText],
+              ["reports", "گزارش‌های دریافتی", Flag],
+              ["bans", "لیست بن", Ban],
+              ["welcome", "ولکام اسکرین", Waves],
+              ["backup", "بکاپ", DatabaseBackup],
+              ["danger", "حذف سرور", Trash2],
             ] as const
           ).map(([id, label, Icon]) => (
             <motion.button
@@ -121,7 +164,7 @@ export function SettingsPanel() {
             exit="exit"
             className="space-y-5"
           >
-            {tab === "profile" && <ProfileTab />}
+            {tab === "profile" && <ServerProfileTab onError={onError} />}
             {tab === "channels" && (
               <ChannelsTab
                 canManage={canManageChannels}
@@ -134,10 +177,216 @@ export function SettingsPanel() {
             {tab === "roles" && <RolesTab canManage={canManageRoles} onError={onError} />}
             {tab === "invites" && <InvitesTab canManage={canInvite} onError={onError} />}
             {tab === "audit" && <AuditTab canManage={canAudit} onError={onError} />}
+            {tab === "reports" && <ReportsTab onError={onError} />}
+            {tab === "emoji" && <EmojiTab onError={onError} />}
+            {tab === "members" && <MembersTab onError={onError} />}
+            {tab === "bans" && <BansTab onError={onError} />}
+            {tab === "welcome" && <WelcomeTab onError={onError} />}
+            {tab === "backup" && <BackupTab onError={onError} />}
+            {tab === "danger" && <DangerTab onError={onError} />}
           </motion.div>
         </AnimatePresence>
       </div>
     </div>
+  );
+}
+
+interface ServerProfile {
+  name: string;
+  bio: string;
+  profileUrl: string;
+  backgroundColor: string;
+  visibility: "public" | "private";
+  welcomeTitle: string;
+  welcomeMessage: string;
+}
+
+function ServerProfileTab({ onError }: { onError: (error: string | null) => void }) {
+  const [profile, setProfile] = useState<ServerProfile | null>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    void api
+      .get<{ profile: ServerProfile }>("/api/admin/server")
+      .then((data) => setProfile(data.profile))
+      .catch((error) => onError((error as Error).message));
+  }, [onError]);
+  if (!profile) return <p className="text-sm text-t4">در حال بارگذاری پروفایل سرور…</p>;
+  async function save() {
+    setBusy(true);
+    try {
+      const data = await api.patch<{ profile: ServerProfile }>("/api/admin/server", profile);
+      setProfile(data.profile);
+      onError(null);
+    } catch (error) {
+      onError((error as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <section className="space-y-4 rounded-lg bg-card p-5">
+      <Field
+        label="نام سرور"
+        value={profile.name}
+        onChange={(event) => setProfile({ ...profile, name: event.target.value })}
+      />
+      <label className="block text-sm">
+        <span className="mb-1.5 block text-xs font-bold text-t3">بیو سرور</span>
+        <textarea
+          value={profile.bio}
+          onChange={(event) => setProfile({ ...profile, bio: event.target.value })}
+          rows={3}
+          className="w-full rounded-md bg-deep p-3 text-t2 outline-none focus:ring-1 focus:ring-brand"
+        />
+      </label>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field
+          label="آدرس تصویر پروفایل"
+          value={profile.profileUrl}
+          onChange={(event) => setProfile({ ...profile, profileUrl: event.target.value })}
+          dir="ltr"
+        />
+        <Field
+          label="رنگ پس‌زمینه"
+          type="color"
+          value={profile.backgroundColor}
+          onChange={(event) => setProfile({ ...profile, backgroundColor: event.target.value })}
+        />
+      </div>
+      <label className="flex items-center gap-2 text-sm text-t2">
+        <input
+          type="checkbox"
+          checked={profile.visibility === "public"}
+          onChange={(event) =>
+            setProfile({ ...profile, visibility: event.target.checked ? "public" : "private" })
+          }
+          className="size-4 accent-brand"
+        />
+        سرور پابلیک باشد
+      </label>
+      <Button loading={busy} onClick={() => void save()}>
+        ذخیره پروفایل سرور
+      </Button>
+    </section>
+  );
+}
+
+interface AdminMember {
+  id: string;
+  username: string;
+  displayName: string;
+  avatarColor: string;
+  avatarUrl?: string | null;
+  status: "online" | "idle" | "dnd" | "offline";
+  isAdmin: boolean;
+  roles: { id: string; name: string; color: string }[];
+}
+
+function MembersTab({ onError }: { onError: (error: string | null) => void }) {
+  const [members, setMembers] = useState<AdminMember[]>([]);
+  const [query, setQuery] = useState("");
+  const load = useCallback(async () => {
+    const data = await api.get<{ members: AdminMember[] }>(
+      `/api/admin/members?q=${encodeURIComponent(query)}`,
+    );
+    setMembers(data.members);
+  }, [query]);
+  useEffect(() => {
+    const timer = setTimeout(() => void load().catch((error) => onError(error.message)), 250);
+    return () => clearTimeout(timer);
+  }, [load, onError]);
+  async function ban(member: AdminMember) {
+    if (!confirm(`کاربر ${member.displayName} بن شود؟`)) return;
+    try {
+      await api.post("/api/admin/bans", { userId: member.id, reason: "بن از پنل مدیریت" });
+      await load();
+    } catch (error) {
+      onError((error as Error).message);
+    }
+  }
+  return (
+    <section className="rounded-lg bg-card p-5">
+      <Field
+        label="جست‌وجوی ممبر"
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+        placeholder="نام یا نام کاربری"
+      />
+      <ul className="mt-4 space-y-1">
+        {members.map((member) => (
+          <li key={member.id} className="flex items-center gap-3 rounded-md bg-deep p-3">
+            <Avatar
+              name={member.displayName}
+              color={member.avatarColor}
+              url={member.avatarUrl}
+              presence={member.status}
+              size="md"
+            />
+            <span className="min-w-0">
+              <strong className="block truncate text-sm text-t1">{member.displayName}</strong>
+              <span className="text-2xs text-t4" dir="ltr">
+                @{member.username}
+              </span>
+            </span>
+            <span className="ms-auto flex gap-1">
+              {member.roles.map((role) => (
+                <Badge key={role.id} tone="outline">
+                  {role.name}
+                </Badge>
+              ))}
+              {!member.isAdmin && (
+                <button onClick={() => void ban(member)} className="ms-2 text-xs text-danger">
+                  بن
+                </button>
+              )}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+interface BanRow {
+  userId: string;
+  username: string;
+  displayName: string;
+  reason: string | null;
+  bannedBy: string | null;
+}
+
+function BansTab({ onError }: { onError: (error: string | null) => void }) {
+  const [bans, setBans] = useState<BanRow[]>([]);
+  const load = useCallback(
+    () =>
+      api
+        .get<{ bans: BanRow[] }>("/api/admin/bans")
+        .then((data) => setBans(data.bans))
+        .catch((error) => onError((error as Error).message)),
+    [onError],
+  );
+  useEffect(() => void load(), [load]);
+  async function unban(userId: string) {
+    await api.del(`/api/admin/bans?userId=${encodeURIComponent(userId)}`);
+    await load();
+  }
+  return (
+    <section className="rounded-lg bg-card p-5">
+      <ul className="space-y-2">
+        {bans.map((ban) => (
+          <li key={ban.userId} className="flex items-center gap-3 rounded-md bg-deep p-3">
+            <span>
+              <strong className="block text-sm text-t1">{ban.displayName}</strong>
+              <span className="text-xs text-t4">{ban.reason || "بدون دلیل"}</span>
+            </span>
+            <button onClick={() => void unban(ban.userId)} className="ms-auto text-xs text-success">
+              رفع بن
+            </button>
+          </li>
+        ))}
+        {!bans.length && <li className="py-4 text-center text-sm text-t4">لیست بن خالی است.</li>}
+      </ul>
+    </section>
   );
 }
 
@@ -408,6 +657,15 @@ function InvitesTab({
     }
   }
 
+  async function revoke(code: string) {
+    try {
+      await api.del(`/api/invites?code=${encodeURIComponent(code)}`);
+      setInvites((items) => items.filter((invite) => invite.code !== code));
+    } catch (err) {
+      onError((err as Error).message);
+    }
+  }
+
   return (
     <section className="rounded-lg bg-card p-5">
       <div className="flex items-center gap-3">
@@ -436,6 +694,10 @@ function InvitesTab({
             <span className="tnum ms-auto text-xs text-t4">
               {fa(i.uses)}/{i.maxUses ? fa(i.maxUses) : "∞"}
             </span>
+            {i.createdBy && <span className="text-2xs text-t5">سازنده: {i.createdBy}</span>}
+            <button onClick={() => void revoke(i.code)} className="text-xs text-danger">
+              ریووک
+            </button>
           </li>
         ))}
         {invites.length === 0 && (

@@ -2,9 +2,11 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  Bell,
   ChevronDown,
   Copy,
   Download,
+  Flag,
   Hash,
   HeadphoneOff,
   Link2,
@@ -12,6 +14,8 @@ import {
   MicOff,
   Radio,
   Settings,
+  Star,
+  UserMinus,
   Volume2,
 } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -28,6 +32,7 @@ import { Menu } from "@/components/ui/Menu";
 import { springSnappy, tapSoft } from "@/lib/motion";
 import { useShell } from "@/store/use-shell";
 import { SERVER_URL } from "@/lib/config";
+import { ServerMemberDialogs, type ServerDialog } from "@/components/shell/ServerMemberDialogs";
 
 /** مرجع ثابت تا سلکتور zustand هر رندر آرایه‌ی تازه نسازد. */
 const EMPTY_PARTICIPANTS: VoiceParticipant[] = [];
@@ -42,6 +47,59 @@ export function ChannelSidebar() {
   const pushToast = useApp((s) => s.pushToast);
   const isAdmin = useApp((s) => Boolean(s.me?.isAdmin));
   const setView = useShell((s) => s.setView);
+  const [dialog, setDialog] = useState<ServerDialog>(null);
+  const serverMenu = isAdmin
+    ? [
+        {
+          label: "ویش سرور",
+          icon: <Star className="size-4" />,
+          onSelect: () => pushToast("ویش سرور به‌زودی فعال می‌شود", "info" as const),
+        },
+        {
+          label: "اینوایت سرور",
+          icon: <Link2 className="size-4" />,
+          onSelect: () => setView("serverSettings", { tab: "invites" }),
+        },
+        {
+          label: "تنظیمات سرور",
+          icon: <Settings className="size-4" />,
+          onSelect: () => setView("serverSettings", { tab: "profile" }),
+        },
+        {
+          label: "تنظیمات اعلان",
+          icon: <Bell className="size-4" />,
+          onSelect: () => setDialog("notifications"),
+        },
+        {
+          label: "گزارش",
+          icon: <Flag className="size-4" />,
+          onSelect: () => setView("serverSettings", { tab: "reports" }),
+        },
+      ]
+    : [
+        {
+          label: "ویش سرور",
+          icon: <Star className="size-4" />,
+          onSelect: () => pushToast("ویش سرور به‌زودی فعال می‌شود", "info" as const),
+        },
+        {
+          label: "تنظیمات اعلان",
+          icon: <Bell className="size-4" />,
+          onSelect: () => setDialog("notifications"),
+        },
+        {
+          label: "گزارش سرور",
+          icon: <Flag className="size-4" />,
+          onSelect: () => setDialog("report"),
+        },
+        {
+          label: "ترک سرور",
+          icon: <UserMinus className="size-4" />,
+          danger: true,
+          separated: true,
+          onSelect: () => setDialog("leave"),
+        },
+      ];
 
   const groups = useMemo(() => {
     const ordered = [...categories].sort((a, b) => a.position - b.position);
@@ -62,12 +120,14 @@ export function ChannelSidebar() {
 
   return (
     <div className="bg-sidebar-deep flex w-[252px] shrink-0 flex-col">
+      <ServerMemberDialogs dialog={dialog} onClose={() => setDialog(null)} />
       {/* سرصفحه‌ی سرور — منوی واقعی، نه دکمه‌ی تزئینی */}
       <Menu
         label="منوی سرور"
         align="start"
         className="shadow-line"
         items={[
+          ...serverMenu,
           {
             label: "کپی لینک سرور",
             icon: <Link2 className="size-4" />,
@@ -83,11 +143,6 @@ export function ChannelSidebar() {
             icon: <Download className="size-4" />,
             separated: true,
             onSelect: () => setView("updates"),
-          },
-          {
-            label: isAdmin ? "تنظیمات سرور و نقش‌ها" : "تنظیمات من",
-            icon: <Settings className="size-4" />,
-            onSelect: () => setView("settings"),
           },
         ]}
         trigger={({ open, toggle }) => (

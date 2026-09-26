@@ -34,6 +34,9 @@ interface VoiceState {
   error: string | null;
   /** متن مرحله‌ی جاری اتصال؛ برای اینکه کاربر بداند چه خبر است. */
   phase: string | null;
+  /** حذف نویز هوشمند Krisp روی صدای میکروفون پیش از ارسال. */
+  noiseCancellation: boolean;
+  noiseFilterActive: boolean;
 
   join(channelId: string): Promise<void>;
   leave(): Promise<void>;
@@ -42,10 +45,12 @@ interface VoiceState {
   toggleMute(): Promise<void>;
   toggleDeafen(): Promise<void>;
   toggleScreenShare(): Promise<void>;
+  toggleNoiseCancellation(): Promise<void>;
 }
 
 // اتاق LiveKit بیرون از state نگه داشته می‌شود؛ یک نمونه در کل اپ.
 let room: import("livekit-client").Room | null = null;
+let noiseProcessor: import("@livekit/krisp-noise-filter").KrispNoiseFilterProcessor | null = null;
 let statsTimer: ReturnType<typeof setInterval> | null = null;
 /** شمارنده‌ی تلاش اتصال؛ نتیجه‌ی تلاش‌های قدیمی نباید state جدید را خراب کند. */
 let joinAttempt = 0;
@@ -72,6 +77,48 @@ function withTimeout<T>(p: Promise<T>, ms: number, message: string): Promise<T> 
   });
 }
 
+/** پینگ قابل‌نمایش حتی وقتی کاربر تنها عضو اتاق است و WebRTC آمار remote ندارد. */
+async function measureServerRtt(): Promise<number | null> {
+  const started = performance.now();
+  try {
+    await fetch(`/api/health?voicePing=${Date.now()}`, {
+      cache: "no-store",
+      credentials: "same-origin",
+    });
+    return Math.max(1, Math.round(performance.now() - started));
+  } catch {
+    return null;
+  }
+}
+
+function savedNoisePreference(): boolean {
+  if (typeof window === "undefined") return true;
+  return window.localStorage.getItem("sr:noise-cancellation") !== "off";
+}
+
+async function applyNoiseFilter(enabled: boolean): Promise<boolean> {
+  if (!room) return false;
+  const { Track } = await import("livekit-client");
+  const microphone = room.localParticipant.getTrackPublication(Track.Source.Microphone)?.audioTrack;
+  if (!microphone) return false;
+
+  if (!enabled) {
+    if (noiseProcessor) await noiseProcessor.setEnabled(false).catch(() => {});
+    return false;
+  }
+
+  const { KrispNoiseFilter, isKrispNoiseFilterSupported } =
+    await import("@livekit/krisp-noise-filter");
+  if (!isKrispNoiseFilterSupported()) return false;
+  if (!noiseProcessor) {
+    noiseProcessor = KrispNoiseFilter({ quality: "medium", useBVC: true });
+    await microphone.setProcessor(noiseProcessor);
+  } else {
+    await noiseProcessor.setEnabled(true);
+  }
+  return true;
+}
+
 export const useVoice = create<VoiceState>()((set, get) => ({
   status: "idle",
   channelId: null,
@@ -86,6 +133,8 @@ export const useVoice = create<VoiceState>()((set, get) => ({
   ping: null,
   error: null,
   phase: null,
+  noiseCancellation: savedNoisePreference(),
+  noiseFilterActive: false,
 
   async join(channelId) {
     if (get().channelId === channelId && get().status === "connected") return;
@@ -153,6 +202,14 @@ export const useVoice = create<VoiceState>()((set, get) => ({
         }
       });
       r.on(RoomEvent.Disconnected, () => {
+        if (statsTimer) {
+          clearInterval(statsTimer);
+          statsTimer = null;
+        }
+        if (noiseProcessor) {
+          void noiseProcessor.destroy().catch(() => {});
+          noiseProcessor = null;
+        }
         useSession.getState().setInCall(false);
         set({
           status: "idle",
@@ -162,6 +219,7 @@ export const useVoice = create<VoiceState>()((set, get) => ({
           screens: [],
           streaming: false,
           ping: null,
+          noiseFilterActive: false,
         });
         useApp.getState().publishVoiceState({ channelId: null, muted: false, deafened: false });
       });
@@ -190,6 +248,15 @@ export const useVoice = create<VoiceState>()((set, get) => ({
         await r.localParticipant.setMicrophoneEnabled(true).catch(() => {
           useApp.getState().pushToast("میکروفون باز نشد؛ شنونده وارد شدی", "warning");
         });
+        if (get().noiseCancellation) {
+          const active = await applyNoiseFilter(true).catch(() => false);
+          set({ noiseFilterActive: active });
+          if (!active) {
+            useApp
+              .getState()
+              .pushToast("نویزگیر هوشمند روی این مرورگر پشتیبانی نمی‌شود", "warning");
+          }
+        }
       }
       if (!alive()) {
         void r.disconnect().catch(() => {});
@@ -215,28 +282,45 @@ export const useVoice = create<VoiceState>()((set, get) => ({
         .publishVoiceState({ channelId, muted: !auth.canSpeak, deafened: get().deafened });
 
       // تأخیر واقعی را از گزارش WebRTC می‌خوانیم، نه عدد ساختگی.
-      statsTimer = setInterval(async () => {
+      const updatePing = async () => {
         const first = [...r.remoteParticipants.values()][0];
         const pub = first ? [...first.audioTrackPublications.values()][0] : undefined;
         const stats = await pub?.track?.getRTCStatsReport?.().catch(() => null);
-        if (!stats) return;
         let rtt: number | null = null;
-        stats.forEach((report) => {
+        stats?.forEach((report) => {
           const rec = report as { type?: string; roundTripTime?: number };
           if (rec.type === "remote-inbound-rtp" && typeof rec.roundTripTime === "number") {
             rtt = Math.round(rec.roundTripTime * 1000);
           }
         });
+        // بدون remote participant، RTT سرویس اصلی را نشان می‌دهیم؛ دیگر «—» نمی‌ماند.
+        if (rtt === null) rtt = await measureServerRtt();
         if (rtt !== null) set({ ping: rtt });
-      }, 5_000);
+      };
+      void updatePing();
+      statsTimer = setInterval(() => void updatePing(), 5_000);
     } catch (err) {
       if (!alive()) return;
+      if (statsTimer) {
+        clearInterval(statsTimer);
+        statsTimer = null;
+      }
       const message = (err as Error).message || "اتصال صدا برقرار نشد";
       if (room) {
         void room.disconnect().catch(() => {});
         room = null;
       }
-      set({ status: "error", error: message, channelId: null, phase: null });
+      if (noiseProcessor) {
+        void noiseProcessor.destroy().catch(() => {});
+        noiseProcessor = null;
+      }
+      set({
+        status: "error",
+        error: message,
+        channelId: null,
+        phase: null,
+        noiseFilterActive: false,
+      });
       useApp.getState().pushToast(message, "error");
     }
   },
@@ -256,6 +340,10 @@ export const useVoice = create<VoiceState>()((set, get) => ({
     }
     const old = room;
     room = null;
+    if (noiseProcessor) {
+      void noiseProcessor.destroy().catch(() => {});
+      noiseProcessor = null;
+    }
     if (old) void old.disconnect().catch(() => {});
     useSession.getState().setInCall(false);
     set({
@@ -268,6 +356,7 @@ export const useVoice = create<VoiceState>()((set, get) => ({
       ping: null,
       phase: null,
       error: null,
+      noiseFilterActive: false,
     });
     useApp.getState().publishVoiceState({ channelId: null, muted: false, deafened: false });
   },
@@ -328,5 +417,35 @@ export const useVoice = create<VoiceState>()((set, get) => ({
       }
       set({ streaming: false });
     }
+  },
+
+  async toggleNoiseCancellation() {
+    const enabled = !get().noiseCancellation;
+    set({ noiseCancellation: enabled });
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("sr:noise-cancellation", enabled ? "on" : "off");
+    }
+    if (!room || get().status !== "connected") {
+      set({ noiseFilterActive: false });
+      useApp
+        .getState()
+        .pushToast(
+          enabled ? "نویزگیر هوشمند برای تماس بعدی روشن شد" : "نویزگیر هوشمند خاموش شد",
+          "success",
+        );
+      return;
+    }
+    const active = await applyNoiseFilter(enabled).catch(() => false);
+    set({ noiseFilterActive: active });
+    useApp
+      .getState()
+      .pushToast(
+        enabled && active
+          ? "نویزگیر هوشمند فعال شد"
+          : enabled
+            ? "این مرورگر از نویزگیر هوشمند پشتیبانی نمی‌کند"
+            : "نویزگیر هوشمند خاموش شد",
+        enabled && !active ? "warning" : "success",
+      );
   },
 }));

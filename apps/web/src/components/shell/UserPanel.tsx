@@ -2,7 +2,6 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, Headphones, HeadphoneOff, LogOut, Mic, MicOff, Settings } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { PresenceStatus } from "@sr/protocol";
@@ -12,6 +11,7 @@ import { api } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import { useApp } from "@/store/use-app";
 import { useVoice } from "@/store/use-voice";
+import { useShell } from "@/store/use-shell";
 
 const STATUSES: { id: PresenceStatus; label: string; dot: string; hint: string }[] = [
   { id: "online", label: "آنلاین", dot: "bg-success", hint: "در دسترس" },
@@ -30,6 +30,7 @@ export function UserPanel() {
   const toggleMute = useVoice((s) => s.toggleMute);
   const toggleDeafen = useVoice((s) => s.toggleDeafen);
   const leave = useVoice((s) => s.leave);
+  const setView = useShell((s) => s.setView);
 
   const [menu, setMenu] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -132,8 +133,9 @@ export function UserPanel() {
           )}
         </IconButton>
         <Tooltip label="تنظیمات">
-          <Link
-            href="/app/settings"
+          <motion.button
+            type="button"
+            onClick={() => setView("accountSettings")}
             className="grid size-8 place-items-center rounded-[4px] text-t3 transition-colors hover:bg-hover hover:text-t1"
           >
             <motion.span
@@ -142,7 +144,7 @@ export function UserPanel() {
             >
               <Settings className="size-4" />
             </motion.span>
-          </Link>
+          </motion.button>
         </Tooltip>
         <IconButton title="خروج از حساب" onClick={() => void signOut()}>
           <LogOut className="size-4" />

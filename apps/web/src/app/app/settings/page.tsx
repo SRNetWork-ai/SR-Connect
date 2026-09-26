@@ -1,7 +1,7 @@
 import { ShellViews } from "@/components/shell/ShellViews";
 
-export const metadata = { title: "تنظیمات سرور" };
+export const metadata = { title: "تنظیمات حساب" };
 
 export default function SettingsPage() {
-  return <ShellViews initial="settings" />;
+  return <ShellViews initial="accountSettings" />;
 }
