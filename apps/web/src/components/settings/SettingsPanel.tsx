@@ -34,7 +34,7 @@ import {
 } from "@/components/settings/ServerTabs";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/cn";
-import { riseIn, springSnappy, tap } from "@/lib/motion";
+import { riseIn } from "@/lib/motion";
 import { fa } from "@/lib/fmt";
 import { useApp } from "@/store/use-app";
 import { useShell } from "@/store/use-shell";
@@ -96,97 +96,86 @@ export function SettingsPanel() {
 
   const onError = useCallback((e: string | null) => setError(e), []);
 
-  return (
-    <div className="scroll-y flex-1 p-6">
-      <div className="mx-auto max-w-[820px] space-y-5">
-        <header className="flex items-center gap-3">
-          <Shield className="size-6 text-brand" />
-          <div>
-            <h1 className="text-xl font-bold text-t1">تنظیمات سرور</h1>
-            <p className="text-sm text-t4">
-              پروفایل سرور، اعضا، نقش‌ها، دعوت‌نامه‌ها، گزارش و پشتیبان
-            </p>
-          </div>
-        </header>
+  const ITEMS = [
+    ["profile", "پروفایل سرور", UserRound],
+    ["channels", "کانال‌ها", Hash],
+    ["emoji", "ایموجی و استیکر", ImagePlus],
+    ["members", "ممبرها", Users],
+    ["roles", "نقش‌ها و دسترسی", Shield],
+    ["invites", "دعوت‌نامه‌ها", Link2],
+    ["welcome", "ولکام اسکرین", Waves],
+    ["audit", "گزارش فعالیت", ScrollText],
+    ["reports", "گزارش‌های دریافتی", Flag],
+    ["bans", "لیست بن", Ban],
+    ["backup", "بکاپ", DatabaseBackup],
+    ["danger", "حذف سرور", Trash2],
+  ] as const;
 
-        <nav className="scroll-x flex gap-1.5 overflow-x-auto pb-1">
-          {(
-            [
-              ["profile", "پروفایل سرور", UserRound],
-              ["channels", "کانال‌ها", Hash],
-              ["emoji", "ایموجی و استیکر", ImagePlus],
-              ["members", "ممبرها", Users],
-              ["roles", "نقش‌ها و دسترسی", Users],
-              ["invites", "دعوت‌نامه‌ها", Link2],
-              ["audit", "گزارش فعالیت", ScrollText],
-              ["reports", "گزارش‌های دریافتی", Flag],
-              ["bans", "لیست بن", Ban],
-              ["welcome", "ولکام اسکرین", Waves],
-              ["backup", "بکاپ", DatabaseBackup],
-              ["danger", "حذف سرور", Trash2],
-            ] as const
-          ).map(([id, label, Icon]) => (
-            <motion.button
-              key={id}
-              type="button"
-              whileTap={tap}
-              onClick={() => setTab(id)}
-              aria-selected={tab === id}
-              className={cn(
-                "relative flex items-center gap-1.5 rounded-[6px] px-3 py-1.5 text-sm transition-colors",
-                tab === id ? "text-white" : "bg-card text-t3 hover:bg-hover",
-              )}
+  return (
+    <div className="flex min-h-0 flex-1">
+      {/* منوی کناری مثل تنظیمات شخصی؛ نوار افقی با ۱۲ تب قابل استفاده نبود. */}
+      <aside className="scroll-y w-[250px] shrink-0 bg-sidebar-deep p-4">
+        <h1 className="mb-3 px-2 text-base font-black text-t1">تنظیمات سرور</h1>
+        {ITEMS.map(([id, label, Icon]) => (
+          <button
+            key={id}
+            onClick={() => setTab(id)}
+            className={cn(
+              "mb-1 flex w-full items-center gap-2 rounded-md px-3 py-2 text-start text-sm transition-colors",
+              tab === id
+                ? id === "danger"
+                  ? "bg-danger text-white"
+                  : "bg-brand text-white"
+                : id === "danger"
+                  ? "text-[#ff8a8d] hover:bg-danger-soft"
+                  : "text-t3 hover:bg-hover hover:text-t1",
+            )}
+          >
+            <Icon className="size-4" />
+            <span>{label}</span>
+          </button>
+        ))}
+      </aside>
+
+      <main className="scroll-y flex-1 p-7">
+        <div className="mx-auto max-w-[760px] space-y-5">
+          {error && (
+            <p className="rounded-md bg-danger-soft px-3 py-2 text-sm text-[#ff8a8d]">{error}</p>
+          )}
+
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={tab}
+              variants={riseIn}
+              initial="hidden"
+              animate="show"
+              exit="exit"
+              className="space-y-5"
             >
-              {tab === id && (
-                <motion.span
-                  layoutId="settings-tab"
-                  transition={springSnappy}
-                  className="absolute inset-0 -z-10 rounded-[6px] bg-brand shadow-[0_4px_14px_-6px_var(--color-brand)]"
+              {tab === "profile" && <ServerProfileTab onError={onError} />}
+              {tab === "channels" && (
+                <ChannelsTab
+                  canManage={canManageChannels}
+                  channels={channels}
+                  categories={categories}
+                  onChanged={refreshChannels}
+                  onError={onError}
                 />
               )}
-              <Icon className="size-3.5" />
-              {label}
-            </motion.button>
-          ))}
-        </nav>
-
-        {error && (
-          <p className="rounded-md bg-danger-soft px-3 py-2 text-sm text-[#ff8a8d]">{error}</p>
-        )}
-
-        {/* محتوای تب با گذار نرم عوض می‌شود تا جابه‌جایی «پرش» نداشته باشد. */}
-        <AnimatePresence mode="wait" initial={false}>
-          <motion.div
-            key={tab}
-            variants={riseIn}
-            initial="hidden"
-            animate="show"
-            exit="exit"
-            className="space-y-5"
-          >
-            {tab === "profile" && <ServerProfileTab onError={onError} />}
-            {tab === "channels" && (
-              <ChannelsTab
-                canManage={canManageChannels}
-                channels={channels}
-                categories={categories}
-                onChanged={refreshChannels}
-                onError={onError}
-              />
-            )}
-            {tab === "roles" && <RolesTab canManage={canManageRoles} onError={onError} />}
-            {tab === "invites" && <InvitesTab canManage={canInvite} onError={onError} />}
-            {tab === "audit" && <AuditTab canManage={canAudit} onError={onError} />}
-            {tab === "reports" && <ReportsTab onError={onError} />}
-            {tab === "emoji" && <EmojiTab onError={onError} />}
-            {tab === "members" && <MembersTab onError={onError} />}
-            {tab === "bans" && <BansTab onError={onError} />}
-            {tab === "welcome" && <WelcomeTab onError={onError} />}
-            {tab === "backup" && <BackupTab onError={onError} />}
-            {tab === "danger" && <DangerTab onError={onError} />}
-          </motion.div>
-        </AnimatePresence>
-      </div>
+              {tab === "roles" && <RolesTab canManage={canManageRoles} onError={onError} />}
+              {tab === "invites" && <InvitesTab canManage={canInvite} onError={onError} />}
+              {tab === "audit" && <AuditTab canManage={canAudit} onError={onError} />}
+              {tab === "reports" && <ReportsTab onError={onError} />}
+              {tab === "emoji" && <EmojiTab onError={onError} />}
+              {tab === "members" && <MembersTab onError={onError} />}
+              {tab === "bans" && <BansTab onError={onError} />}
+              {tab === "welcome" && <WelcomeTab onError={onError} />}
+              {tab === "backup" && <BackupTab onError={onError} />}
+              {tab === "danger" && <DangerTab onError={onError} />}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      </main>
     </div>
   );
 }

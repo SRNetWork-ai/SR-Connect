@@ -6,10 +6,12 @@ import {
   Headphones,
   LogOut,
   MessageSquareLock,
+  RefreshCw,
   ShieldCheck,
   Sparkles,
   Trash2,
   UserRound,
+  Volume2,
   WandSparkles,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -21,6 +23,15 @@ import { api } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import { useApp } from "@/store/use-app";
 import { useVoice } from "@/store/use-voice";
+import {
+  playSound,
+  setSoundVolume,
+  setSoundsEnabled,
+  soundVolume,
+  soundsEnabled,
+  type SoundName,
+} from "@/lib/sounds";
+import { autoUpdateEnabled, setAutoUpdateEnabled } from "@/lib/updater/prefs";
 
 type AccountTab =
   | "account"
@@ -375,7 +386,144 @@ function VoiceSettings() {
           تماس‌های بعدی به‌صورت خودکار اعمال خواهد شد.
         </p>
       </div>
+
+      <SoundSettings />
+      <AutoUpdateSetting />
     </section>
+  );
+}
+
+const SOUND_DEMO: { id: SoundName; label: string }[] = [
+  { id: "join", label: "ورود به کانال" },
+  { id: "leave", label: "خروج از کانال" },
+  { id: "mute", label: "بی‌صدا" },
+  { id: "deafen", label: "قطع صدا" },
+  { id: "streamStart", label: "شروع پخش زنده" },
+  { id: "ring", label: "زنگ تماس" },
+];
+
+function SoundSettings() {
+  const [on, setOn] = useState(true);
+  const [volume, setVolume] = useState(0.5);
+
+  // مقدار واقعی فقط روی کلاینت موجود است؛ خواندنش در render باعث ناهماهنگی می‌شد.
+  useEffect(() => {
+    setOn(soundsEnabled());
+    setVolume(soundVolume());
+  }, []);
+
+  return (
+    <div className="mt-4 rounded-xl bg-card p-5">
+      <div className="flex items-center gap-4">
+        <span className="grid size-11 place-items-center rounded-lg bg-brand-soft text-brand">
+          <Volume2 className="size-5" />
+        </span>
+        <span className="flex-1">
+          <strong className="block text-t1">صداهای اپ</strong>
+          <span className="mt-1 block text-xs leading-6 text-t4">
+            ورود، خروج، بی‌صدا، قطع صدا، پخش زنده و زنگ تماس.
+          </span>
+        </span>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={on}
+          onClick={() => {
+            const next = !on;
+            setOn(next);
+            setSoundsEnabled(next);
+            if (next) playSound("join");
+          }}
+          className={cn(
+            "relative h-7 w-12 shrink-0 rounded-pill transition-colors",
+            on ? "bg-success" : "bg-deep",
+          )}
+        >
+          <span
+            className={cn(
+              "absolute top-1 size-5 rounded-full bg-white shadow transition-[left,right]",
+              on ? "end-1" : "start-1",
+            )}
+          />
+        </button>
+      </div>
+
+      {on && (
+        <>
+          <label className="mt-5 block">
+            <span className="mb-2 block text-xs font-bold text-t3">بلندی صدا</span>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={Math.round(volume * 100)}
+              onChange={(event) => {
+                const next = Number(event.target.value) / 100;
+                setVolume(next);
+                setSoundVolume(next);
+              }}
+              onMouseUp={() => playSound("unmute")}
+              className="w-full accent-[var(--color-brand)]"
+            />
+          </label>
+
+          <div className="mt-4 flex flex-wrap gap-1.5 border-t border-divider pt-4">
+            {SOUND_DEMO.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => playSound(item.id)}
+                className="rounded-pill bg-deep px-3 py-1.5 text-xs text-t3 transition-colors hover:bg-hover hover:text-t1"
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function AutoUpdateSetting() {
+  const [on, setOn] = useState(true);
+  useEffect(() => setOn(autoUpdateEnabled()), []);
+
+  return (
+    <div className="mt-4 rounded-xl bg-card p-5">
+      <div className="flex items-center gap-4">
+        <span className="grid size-11 place-items-center rounded-lg bg-brand-soft text-brand">
+          <RefreshCw className="size-5" />
+        </span>
+        <span className="flex-1">
+          <strong className="block text-t1">به‌روزرسانی خودکار</strong>
+          <span className="mt-1 block text-xs leading-6 text-t4">
+            هر بار که وارد می‌شوی نسخه بررسی و در پس‌زمینه نصب می‌شود. وسط تماس هیچ‌وقت نصب نمی‌شود.
+          </span>
+        </span>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={on}
+          onClick={() => {
+            const next = !on;
+            setOn(next);
+            setAutoUpdateEnabled(next);
+          }}
+          className={cn(
+            "relative h-7 w-12 shrink-0 rounded-pill transition-colors",
+            on ? "bg-success" : "bg-deep",
+          )}
+        >
+          <span
+            className={cn(
+              "absolute top-1 size-5 rounded-full bg-white shadow transition-[left,right]",
+              on ? "end-1" : "start-1",
+            )}
+          />
+        </button>
+      </div>
+    </div>
   );
 }
 

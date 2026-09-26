@@ -117,24 +117,6 @@ export function VoiceStatus() {
               </span>
             </Tooltip>
           )}
-          {connected && (
-            <Tooltip label={`کیفیت اتصال ${fa(quality)}/۳`}>
-              <span className="flex items-end gap-0.5">
-                {[1, 2, 3].map((b) => (
-                  <motion.span
-                    key={b}
-                    animate={{ opacity: b <= quality ? 1 : 0.35 }}
-                    className={cn(
-                      "w-0.5 rounded-sm",
-                      b === 1 ? "h-1.5" : b === 2 ? "h-2.5" : "h-3.5",
-                      b <= quality ? "bg-success" : "bg-stroke",
-                    )}
-                  />
-                ))}
-              </span>
-            </Tooltip>
-          )}
-
           {connecting ? (
             <Tooltip label="لغو اتصال">
               <motion.button
@@ -146,11 +128,17 @@ export function VoiceStatus() {
                 <X className="size-3.5" />
               </motion.button>
             </Tooltip>
-          ) : (
-            <span className="tnum text-2xs whitespace-nowrap text-t4">
-              {connected ? `${ping !== null ? `${fa(ping)} م‌ث · ` : "سنجش… · "}اوپوس ۳۲ک` : "—"}
+          ) : connected ? (
+            /* تنها عددی که واقعاً به کار کاربر می‌آید: تأخیر. رنگش کیفیت را می‌گوید. */
+            <span
+              className={cn(
+                "tnum text-2xs whitespace-nowrap font-bold",
+                quality === 3 ? "text-success" : quality === 2 ? "text-warning" : "text-danger",
+              )}
+            >
+              {ping !== null ? `${fa(ping)} م‌ث` : "سنجش…"}
             </span>
-          )}
+          ) : null}
         </span>
       </div>
 

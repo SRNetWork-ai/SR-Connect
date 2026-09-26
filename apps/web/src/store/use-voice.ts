@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import { api } from "@/lib/api";
+import { playSound } from "@/lib/sounds";
 import { useApp } from "@/store/use-app";
 import { useSession } from "@/store/use-session";
 
@@ -264,6 +265,7 @@ export const useVoice = create<VoiceState>()((set, get) => ({
       }
 
       useSession.getState().setInCall(true);
+      playSound("join");
       set({
         status: "connected",
         channelId,
@@ -314,6 +316,7 @@ export const useVoice = create<VoiceState>()((set, get) => ({
         void noiseProcessor.destroy().catch(() => {});
         noiseProcessor = null;
       }
+      playSound("error");
       set({
         status: "error",
         error: message,
@@ -330,6 +333,7 @@ export const useVoice = create<VoiceState>()((set, get) => ({
    * چند ثانیه طول بکشد و کاربر باید همان لحظه ببیند که قطع شد.
    */
   async leave() {
+    if (get().status === "connected") playSound("leave");
     joinAttempt++;
     if (statsTimer) {
       clearInterval(statsTimer);
@@ -368,6 +372,7 @@ export const useVoice = create<VoiceState>()((set, get) => ({
 
   async toggleMute() {
     const next = !get().muted;
+    playSound(next ? "mute" : "unmute");
     set({ muted: next });
     if (room && get().canSpeak) {
       await room.localParticipant.setMicrophoneEnabled(!next).catch(() => {});
@@ -378,6 +383,7 @@ export const useVoice = create<VoiceState>()((set, get) => ({
 
   async toggleDeafen() {
     const next = !get().deafened;
+    playSound(next ? "deafen" : "undeafen");
     // بی‌صدا کردن هدفون، میکروفون را هم می‌بندد — مثل دیسکورد.
     set({ deafened: next, muted: next ? true : get().muted });
     document
@@ -406,6 +412,7 @@ export const useVoice = create<VoiceState>()((set, get) => ({
         audio: true,
         resolution: { width: 1280, height: 720, frameRate: 15 },
       });
+      playSound(next ? "streamStart" : "streamStop");
       set({ streaming: next });
       const { channelId, muted, deafened } = get();
       useApp.getState().publishVoiceState({ channelId, muted, deafened, streaming: next });

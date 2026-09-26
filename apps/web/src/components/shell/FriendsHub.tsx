@@ -19,6 +19,7 @@ import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import { useApp, type Member } from "@/store/use-app";
 import { useCall } from "@/store/use-call";
+import { SidebarFooter } from "@/components/shell/SidebarFooter";
 
 type FriendFilter = "online" | "all";
 interface Friendship {
@@ -262,7 +263,7 @@ export function FriendsHub() {
         )}
 
         <p className="mt-5 px-1 text-xs font-bold text-t4">پیام‌های خصوصی</p>
-        <div className="scroll-y mt-2 space-y-1">
+        <div className="scroll-y mt-2 min-h-0 flex-1 space-y-1">
           {people.map((friendship) => (
             <button
               key={friendship.id}
@@ -292,6 +293,10 @@ export function FriendsHub() {
           {people.length === 0 && (
             <p className="px-2 py-6 text-center text-xs text-t5">دوستی با این فیلتر پیدا نشد.</p>
           )}
+        </div>
+
+        <div className="-mx-3 -mb-3 mt-3">
+          <SidebarFooter />
         </div>
       </aside>
 

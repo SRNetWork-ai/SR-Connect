@@ -24,8 +24,7 @@ import { cn } from "@/lib/cn";
 import { fa } from "@/lib/fmt";
 import { Avatar } from "@/components/ui/Avatar";
 import { Tooltip } from "@/components/ui/Tooltip";
-import { UserPanel } from "@/components/shell/UserPanel";
-import { VoiceStatus } from "@/components/shell/VoiceStatus";
+import { SidebarFooter } from "@/components/shell/SidebarFooter";
 import { useApp } from "@/store/use-app";
 import { useVoice } from "@/store/use-voice";
 import { Menu } from "@/components/ui/Menu";
@@ -225,8 +224,7 @@ export function ChannelSidebar() {
         <div className="h-2" />
       </div>
 
-      <VoiceStatus />
-      <UserPanel />
+      <SidebarFooter />
     </div>
   );
 }
