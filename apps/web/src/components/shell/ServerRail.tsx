@@ -1,12 +1,10 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Download, MessageSquare, Settings, Shield } from "lucide-react";
-import Link from "next/link";
+import { Download, MessageSquare, Shield } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { fa } from "@/lib/fmt";
 import { springSnappy, tap } from "@/lib/motion";
-import { Logo } from "@/components/ui/Logo";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { useApp } from "@/store/use-app";
 import { useShell, type ShellView } from "@/store/use-shell";
@@ -20,7 +18,6 @@ interface NavItem {
 const NAV: NavItem[] = [
   { view: "chat", label: "گفت‌وگو", icon: MessageSquare },
   { view: "updates", label: "مرکز آپدیت", icon: Download },
-  { view: "settings", label: "تنظیمات و نقش‌ها", icon: Settings },
 ];
 
 export function ServerRail() {
@@ -38,10 +35,19 @@ export function ServerRail() {
       aria-label="بخش‌ها"
       className="bg-rail-deep flex w-[72px] shrink-0 flex-col items-center gap-2 py-3"
     >
-      <Tooltip label="صفحه‌ی اسپلش" side="end">
-        <Link href="/" className="press rounded-[16px]">
-          <Logo size={48} />
-        </Link>
+      <Tooltip label="دوستان و پیام‌های خصوصی" side="end">
+        <motion.button
+          type="button"
+          whileTap={tap}
+          onClick={() => setView("friends")}
+          aria-label="دوستان و پیام‌های خصوصی"
+          className={cn(
+            "grid size-12 place-items-center rounded-[16px] text-base font-black transition-colors",
+            view === "friends" ? "bg-brand text-white" : "bg-card text-t2 hover:bg-brand",
+          )}
+        >
+          SR
+        </motion.button>
       </Tooltip>
       <span className="my-1 h-0.5 w-8 rounded-full bg-[#35363c]" />
 

@@ -2,18 +2,22 @@
 
 import { create } from "zustand";
 
-export type ShellView = "chat" | "updates" | "settings";
+export type ShellView = "friends" | "chat" | "updates" | "accountSettings" | "serverSettings";
 
 export const VIEW_PATH: Record<ShellView, string> = {
+  friends: "/app/friends",
   chat: "/app",
   updates: "/app/updates",
-  settings: "/app/settings",
+  accountSettings: "/app/settings",
+  serverSettings: "/app/server-settings",
 };
 
 export const VIEW_TITLE: Record<ShellView, string> = {
+  friends: "دوستان و پیام‌های خصوصی · SR-Connect",
   chat: "گفت‌وگوی عمومی · SR-Connect",
   updates: "مرکز آپدیت · SR-Connect",
-  settings: "تنظیمات سرور · SR-Connect",
+  accountSettings: "تنظیمات حساب · SR-Connect",
+  serverSettings: "تنظیمات سرور · SR-Connect",
 };
 
 interface ShellState {
@@ -48,7 +52,9 @@ export const useShell = create<ShellState>()((set, get) => ({
 
 /** تشخیص نما از مسیر — برای بارگذاری مستقیم و دکمه‌ی back. */
 export function viewFromPath(pathname: string): ShellView {
-  if (pathname.startsWith("/app/settings")) return "settings";
+  if (pathname.startsWith("/app/server-settings")) return "serverSettings";
+  if (pathname.startsWith("/app/settings")) return "accountSettings";
+  if (pathname.startsWith("/app/friends")) return "friends";
   if (pathname.startsWith("/app/updates")) return "updates";
   return "chat";
 }

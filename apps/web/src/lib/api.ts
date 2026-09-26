@@ -40,7 +40,11 @@ export const api = {
       method: "PATCH",
       body: body === undefined ? undefined : JSON.stringify(body),
     }),
-  del: <T>(path: string) => request<T>(path, { method: "DELETE" }),
+  del: <T>(path: string, body?: unknown) =>
+    request<T>(path, {
+      method: "DELETE",
+      body: body === undefined ? undefined : JSON.stringify(body),
+    }),
   /** آپلود چندفایلی؛ برای پیوست پیام و آواتار. */
   upload: <T>(path: string, form: FormData) => request<T>(path, { method: "POST", body: form }),
 };
