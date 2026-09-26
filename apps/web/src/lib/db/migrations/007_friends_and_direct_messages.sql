@@ -46,3 +46,10 @@ create table if not exists user_preferences (
                      check (theme in ('dark', 'midnight', 'contrast')),
   updated_at         timestamptz not null default now()
 );
+
+create table if not exists server_bans (
+  user_id    uuid primary key references users(id) on delete cascade,
+  banned_by uuid references users(id) on delete set null,
+  reason     text,
+  created_at timestamptz not null default now()
+);
