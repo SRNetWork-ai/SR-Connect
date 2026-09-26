@@ -60,13 +60,23 @@ export async function userFromRequest(req: Request): Promise<SessionUser | null>
   return userFromToken(jar.get(SESSION_COOKIE)?.value);
 }
 
-/** پوشش یکسان خطاها: هیچ استک‌تریسی به کلاینت نمی‌رود. */
+/**
+ * پوشش یکسان خطاها: هیچ استک‌تریسی به کلاینت نمی‌رود.
+ *
+ * روی ۴۰۱ کوکی نشست هم پاک می‌شود. بدون این، یک کوکیِ مانده اما باطل باعث
+ * می‌شد میدل‌ور کاربر را از /login دوباره به /app برگرداند و حلقه‌ی بی‌نهایت
+ * بسازد.
+ */
 export async function handle(fn: () => Promise<Response>): Promise<Response> {
   try {
     return await fn();
   } catch (err) {
     if (err instanceof HttpError) {
-      return NextResponse.json({ error: err.message }, { status: err.status });
+      const res = NextResponse.json({ error: err.message }, { status: err.status });
+      if (err.status === 401) {
+        res.cookies.set({ name: SESSION_COOKIE, value: "", path: "/", maxAge: 0 });
+      }
+      return res;
     }
     console.error("[api]", err);
     return NextResponse.json({ error: "خطای داخلی سرور" }, { status: 500 });

@@ -34,10 +34,16 @@ function csp(nonce: string): string {
  * نگهبان لبه: مسیرهای /app بدون کوکی نشست مستقیم به صفحه‌ی ورود می‌روند،
  * و کاربر واردشده با باز کردن /login به اپ برمی‌گردد.
  * اعتبار واقعی توکن سمت سرور بررسی می‌شود؛ این فقط جلوی پرش صفحه را می‌گیرد.
+ *
+ * نکته‌ی مهم (باگ حلقه‌ی بی‌نهایت): میدل‌ور فقط «وجود کوکی» را می‌بیند، نه
+ * معتبر بودنش. اگر کوکی مانده ولی نشست در دیتابیس باطل شده باشد، اپ ۴۰۱
+ * می‌گیرد و به /login می‌رود، میدل‌ور هم دوباره به /app برش می‌گرداند و
+ * کاربر برای همیشه روی صفحه‌ی انتقال گیر می‌کند. پس وقتی خود اپ عمداً کاربر
+ * را به صفحه‌ی ورود فرستاده (پارامتر next یا expired)، این برگشت انجام نمی‌شود.
  */
 export function middleware(req: NextRequest) {
   const hasSession = Boolean(req.cookies.get(SESSION_COOKIE)?.value);
-  const { pathname, search } = req.nextUrl;
+  const { pathname, search, searchParams } = req.nextUrl;
 
   if (pathname.startsWith("/app") && !hasSession) {
     const url = req.nextUrl.clone();
@@ -46,7 +52,8 @@ export function middleware(req: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if ((pathname === "/login" || pathname === "/register") && hasSession) {
+  const sentHereByApp = searchParams.has("next") || searchParams.has("expired");
+  if ((pathname === "/login" || pathname === "/register") && hasSession && !sentHereByApp) {
     const url = req.nextUrl.clone();
     url.pathname = "/app";
     url.search = "";

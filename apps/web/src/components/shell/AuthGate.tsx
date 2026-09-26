@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, Loader2, LogIn, RotateCcw } from "lucide-react";
+import { api } from "@/lib/api";
 import { useApp } from "@/store/use-app";
 import { Button } from "@/components/ui/Button";
 import { Logo } from "@/components/ui/Logo";
@@ -18,7 +19,8 @@ import { Logo } from "@/components/ui/Logo";
  */
 const ROUTER_FALLBACK_MS = 1_200;
 const WATCHDOG_MS = 15_000;
-const LOGIN_PATH = "/login?next=/app";
+/** پرچم expired به میدل‌ور می‌گوید کاربر را دوباره به /app برنگرداند. */
+const LOGIN_PATH = "/login?expired=1&next=/app";
 
 export function AuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -40,10 +42,18 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   // فقط ۴۰۱ به صفحه‌ی ورود می‌رود؛ اگر روتر کلاینتی نرفت، ناوبری سخت انجام می‌شود.
   useEffect(() => {
     if (ready || !unauthorized) return;
-    router.replace(LOGIN_PATH);
-    const hard = setTimeout(() => {
-      if (window.location.pathname.startsWith("/app")) window.location.replace(LOGIN_PATH);
-    }, ROUTER_FALLBACK_MS);
+    let hard: ReturnType<typeof setTimeout> | undefined;
+    // کوکیِ مانده اما باطل باید پاک شود، وگرنه میدل‌ور دوباره ما را به /app
+    // برمی‌گرداند و حلقه‌ی بی‌پایان می‌سازد.
+    void api
+      .post("/api/auth/logout")
+      .catch(() => {})
+      .finally(() => {
+        router.replace(LOGIN_PATH);
+        hard = setTimeout(() => {
+          if (window.location.pathname.startsWith("/app")) window.location.replace(LOGIN_PATH);
+        }, ROUTER_FALLBACK_MS);
+      });
     return () => clearTimeout(hard);
   }, [ready, unauthorized, router]);
 
