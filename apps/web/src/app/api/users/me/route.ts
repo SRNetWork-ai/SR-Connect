@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { one, q } from "@/lib/db/pool";
 import { handle, HttpError, requireUser } from "@/lib/auth/guard";
 import { loadUser } from "@/lib/auth/session";
+import { SESSION_COOKIE } from "@/lib/auth/session";
+import { verifyPassword } from "@/lib/auth/password";
 
 export const dynamic = "force-dynamic";
 
@@ -56,5 +59,34 @@ export function PATCH(req: Request) {
     await q(`update users set ${sets.join(", ")} where id = $${vals.length}`, vals);
 
     return NextResponse.json({ user: await loadUser(user.id) });
+  });
+}
+
+/** حذف حساب فقط بعد از تأیید رمز؛ حذف آخرین مدیر مجاز نیست. */
+export function DELETE(req: Request) {
+  return handle(async () => {
+    const user = await requireUser();
+    const body = (await req.json().catch(() => ({}))) as { password?: string };
+    const row = await one<{ passwordHash: string }>(
+      `select password_hash as "passwordHash" from users where id = $1`,
+      [user.id],
+    );
+    if (!row || !(await verifyPassword(body.password ?? "", row.passwordHash))) {
+      throw new HttpError(403, "رمز حساب درست نیست");
+    }
+    if (user.isAdmin) {
+      const admins = await one<{ total: number }>(
+        `select count(*)::int as total from users where is_admin = true`,
+      );
+      if ((admins?.total ?? 0) <= 1) {
+        throw new HttpError(409, "آخرین مدیر سرور را نمی‌توان حذف کرد");
+      }
+    }
+    await q(`delete from users where id = $1`, [user.id]);
+    const res = NextResponse.json({ ok: true });
+    const jar = await cookies();
+    jar.delete(SESSION_COOKIE);
+    res.cookies.set({ name: SESSION_COOKIE, value: "", path: "/", maxAge: 0 });
+    return res;
   });
 }
