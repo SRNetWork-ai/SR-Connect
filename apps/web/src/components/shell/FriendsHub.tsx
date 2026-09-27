@@ -19,6 +19,7 @@ import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import { useApp, type Member } from "@/store/use-app";
 import { useCall } from "@/store/use-call";
+import { SidebarFooter } from "@/components/shell/SidebarFooter";
 
 type FriendFilter = "online" | "all";
 interface Friendship {
@@ -144,7 +145,7 @@ export function FriendsHub() {
   if (section === "booster") {
     return (
       <div className="grid flex-1 place-items-center p-8">
-        <div className="max-w-md rounded-xl bg-card p-8 text-center">
+        <div className="max-w-md card-3d rounded-xl p-8 text-center">
           <Zap className="mx-auto size-12 text-accent" />
           <h1 className="mt-4 text-xl font-black text-t1">بوستر</h1>
           <span className="mt-3 inline-flex rounded-pill bg-accent/15 px-3 py-1 text-xs font-bold text-accent">
@@ -165,18 +166,23 @@ export function FriendsHub() {
     <div className="flex min-h-0 flex-1">
       <aside className="flex w-[280px] shrink-0 flex-col border-s border-divider bg-sidebar-deep p-3">
         <div className="grid grid-cols-2 gap-2">
-          <button className="rounded-md bg-brand px-3 py-2 text-sm font-bold text-white">
+          <button
+            type="button"
+            data-tone="brand"
+            className="btn-3d rounded-[9px] px-3 py-2 text-sm font-bold"
+          >
             <Users className="me-1 inline size-4" /> فرندز
           </button>
           <button
+            type="button"
             onClick={() => setSection("booster")}
-            className="rounded-md bg-card px-3 py-2 text-sm font-bold text-t3 hover:bg-hover"
+            className="btn-3d rounded-[9px] px-3 py-2 text-sm font-bold text-t3"
           >
             <Zap className="me-1 inline size-4" /> بوستر
           </button>
         </div>
 
-        <label className="mt-4 flex h-9 items-center gap-2 rounded-md bg-deep px-3">
+        <label className="well-3d mt-4 flex h-10 items-center gap-2 rounded-[9px] px-3">
           <Search className="size-4 text-t5" />
           <input
             value={query}
@@ -262,7 +268,7 @@ export function FriendsHub() {
         )}
 
         <p className="mt-5 px-1 text-xs font-bold text-t4">پیام‌های خصوصی</p>
-        <div className="scroll-y mt-2 space-y-1">
+        <div className="scroll-y mt-2 min-h-0 flex-1 space-y-1">
           {people.map((friendship) => (
             <button
               key={friendship.id}
@@ -292,6 +298,10 @@ export function FriendsHub() {
           {people.length === 0 && (
             <p className="px-2 py-6 text-center text-xs text-t5">دوستی با این فیلتر پیدا نشد.</p>
           )}
+        </div>
+
+        <div className="-mx-3 -mb-3 mt-3">
+          <SidebarFooter />
         </div>
       </aside>
 
@@ -384,7 +394,7 @@ export function FriendsHub() {
             </div>
             <form
               onSubmit={sendMessage}
-              className="m-4 flex h-11 items-center rounded-lg bg-card px-3"
+              className="m-4 flex h-11 items-center card-3d rounded-lg px-3"
             >
               <MessageCircle className="me-2 size-4 text-t5" />
               <input

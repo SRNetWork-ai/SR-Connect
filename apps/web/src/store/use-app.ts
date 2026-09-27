@@ -13,6 +13,7 @@ import type {
   VoiceParticipant,
 } from "@sr/protocol";
 import { api, ApiError } from "@/lib/api";
+import { shouldNotify, showDesktopNotice } from "@/lib/notify";
 import { RealtimeSocket, type SocketStatus } from "@/lib/realtime/socket";
 
 export interface Member extends PublicUser {
@@ -220,6 +221,23 @@ export const useApp = create<AppState>()((set, get) => ({
                           },
                         },
                 });
+
+                // اعلان بیرون از اپ: تا حالا پیام وقتی پنجره پشت بقیه بود گم می‌شد.
+                if (!mine) {
+                  const channelName =
+                    state.channels.find((c) => c.id === channelId)?.name ?? "کانال";
+                  const dnd = !!state.me && state.presence[state.me.id] === "dnd";
+                  if (shouldNotify({ channelVisible: focused, dnd })) {
+                    showDesktopNotice({
+                      title: mentioned
+                        ? `${msg.message.author.displayName} شما را منشن کرد`
+                        : `${msg.message.author.displayName} · #${channelName}`,
+                      body: msg.message.content || "یک پیوست فرستاد",
+                      tag: channelId,
+                      onClick: () => get().setActiveChannel(channelId),
+                    });
+                  }
+                }
                 break;
               }
               case "message_update": {

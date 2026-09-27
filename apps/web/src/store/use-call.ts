@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import { api } from "@/lib/api";
+import { playSound, startRinging, stopRinging } from "@/lib/sounds";
 import { useApp } from "@/store/use-app";
 import { useVoice } from "@/store/use-voice";
 
@@ -111,6 +112,9 @@ export const useCall = create<CallState>()((set, get) => ({
   setIncoming(incoming) {
     // وقتی خودمان وسط تماسیم، زنگ دوم نباید صفحه را بگیرد.
     if (get().status === "connected" || get().status === "connecting") return;
+    const had = Boolean(get().incoming);
+    if (incoming && !had) startRinging();
+    if (!incoming && had) stopRinging();
     set({ incoming });
   },
 
@@ -121,6 +125,7 @@ export const useCall = create<CallState>()((set, get) => ({
 
     const current = ++attempt;
     const alive = () => current === attempt;
+    stopRinging();
     set({ status: "connecting", peer, video, error: null, incoming: null, muted: false });
 
     try {
@@ -194,8 +199,12 @@ export const useCall = create<CallState>()((set, get) => ({
 
       // تا وقتی طرف مقابل جواب ندهد، حالت «در حال زنگ خوردن» می‌ماند.
       const answered = r.remoteParticipants.size > 0;
+      if (answered) playSound("callConnected");
       set({ status: answered ? "connected" : "ringing" });
-      r.on(RoomEvent.ParticipantConnected, () => set({ status: "connected" }));
+      r.on(RoomEvent.ParticipantConnected, () => {
+        playSound("callConnected");
+        set({ status: "connected" });
+      });
 
       const updatePing = async () => {
         const first = [...r.remoteParticipants.values()][0];
@@ -215,6 +224,7 @@ export const useCall = create<CallState>()((set, get) => ({
     } catch (error) {
       if (!alive()) return;
       cleanupMedia();
+      playSound("error");
       const message = (error as Error).message || "تماس برقرار نشد";
       set({ status: "error", error: message, peer: null });
       useApp.getState().pushToast(message, "error");
@@ -229,6 +239,7 @@ export const useCall = create<CallState>()((set, get) => ({
 
   async decline() {
     const incoming = get().incoming;
+    stopRinging();
     set({ incoming: null });
     if (incoming) {
       await api.del(`/api/dm/${incoming.caller.id}/call?declined=1`).catch(() => {});
@@ -237,6 +248,8 @@ export const useCall = create<CallState>()((set, get) => ({
 
   async hangUp() {
     attempt++;
+    stopRinging();
+    if (get().status === "connected") playSound("callEnded");
     const peer = get().peer;
     cleanupMedia();
     set({
@@ -254,6 +267,7 @@ export const useCall = create<CallState>()((set, get) => ({
 
   async toggleMute() {
     const next = !get().muted;
+    playSound(next ? "mute" : "unmute");
     set({ muted: next });
     if (room) await room.localParticipant.setMicrophoneEnabled(!next).catch(() => {});
   },

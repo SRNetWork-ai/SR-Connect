@@ -18,3 +18,17 @@ export function ms(n: number): string {
 export function pct(n: number): string {
   return `${fa(Math.round(n))}٪`;
 }
+
+/**
+ * تاریخ کوتاه برای فهرست‌ها و نتایج جست‌وجو.
+ * پیام امروز فقط ساعت می‌گیرد؛ قدیمی‌تر روز و ماه. هر دو شمسی.
+ */
+export function faDate(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  const sameDay = date.toDateString() === new Date().toDateString();
+  return new Intl.DateTimeFormat(
+    "fa-IR",
+    sameDay ? { hour: "2-digit", minute: "2-digit" } : { month: "short", day: "numeric" },
+  ).format(date);
+}

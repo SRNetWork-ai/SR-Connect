@@ -24,8 +24,7 @@ import { cn } from "@/lib/cn";
 import { fa } from "@/lib/fmt";
 import { Avatar } from "@/components/ui/Avatar";
 import { Tooltip } from "@/components/ui/Tooltip";
-import { UserPanel } from "@/components/shell/UserPanel";
-import { VoiceStatus } from "@/components/shell/VoiceStatus";
+import { SidebarFooter } from "@/components/shell/SidebarFooter";
 import { useApp } from "@/store/use-app";
 import { useVoice } from "@/store/use-voice";
 import { Menu } from "@/components/ui/Menu";
@@ -225,8 +224,7 @@ export function ChannelSidebar() {
         <div className="h-2" />
       </div>
 
-      <VoiceStatus />
-      <UserPanel />
+      <SidebarFooter />
     </div>
   );
 }
@@ -255,7 +253,7 @@ function ChannelRow({
         whileTap={{ scale: 0.985 }}
         onClick={() => (isVoice ? void join(channel.id) : onSelect())}
         className={cn(
-          "group relative flex h-[33px] w-full items-center gap-1.5 rounded-[5px] px-2 text-start transition-colors",
+          "group relative flex h-[34px] w-full items-center gap-1.5 rounded-[8px] px-2 text-start transition-colors",
           active ? "bg-[#404249] text-t1" : "text-t4 hover:bg-hover hover:text-t2",
           hasUnread && !active && "text-t1",
         )}
@@ -271,7 +269,7 @@ function ChannelRow({
           <motion.span
             layoutId="channel-active"
             transition={{ type: "spring", stiffness: 420, damping: 34 }}
-            className="absolute inset-0 -z-10 rounded-[5px] bg-[#404249]"
+            className="absolute inset-0 -z-10 rounded-[8px] bg-[#404249] shadow-[inset_0_1px_0_rgb(255_255_255_/_0.08),inset_0_-1px_2px_rgb(0_0_0_/_0.3)]"
           />
         )}
 

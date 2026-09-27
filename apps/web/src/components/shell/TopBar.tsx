@@ -8,6 +8,7 @@ import { Tooltip } from "@/components/ui/Tooltip";
 import { cn } from "@/lib/cn";
 import { fa } from "@/lib/fmt";
 import { useApp } from "@/store/use-app";
+import { useShell } from "@/store/use-shell";
 
 const ORDER = { online: 0, dnd: 1, idle: 2, offline: 3 } as const;
 
@@ -18,6 +19,7 @@ export function TopBar() {
   const presence = useApp((s) => s.presence);
   const unread = useApp((s) => s.unread);
   const setActiveChannel = useApp((s) => s.setActiveChannel);
+  const openSwitcher = useShell((s) => s.openSwitcher);
   const [showMembers, setShowMembers] = useState(false);
   const [query, setQuery] = useState("");
 
@@ -104,6 +106,21 @@ export function TopBar() {
             </button>
           </Tooltip>
         )}
+
+        {/* نقطه‌ی کشف میان‌بُر: بدون این دکمه، Ctrl+K را کسی پیدا نمی‌کند. */}
+        <Tooltip label="جست‌وجو و پرش سریع (Ctrl+K)">
+          <button
+            type="button"
+            onClick={() => openSwitcher("channels")}
+            aria-label="جست‌وجو و پرش سریع"
+            className="well-3d flex h-8 items-center gap-1.5 rounded-pill px-2.5 text-t4 transition-colors hover:text-t2"
+          >
+            <Search className="size-3.5" />
+            <kbd className="hidden font-sans text-2xs font-bold sm:inline" dir="ltr">
+              Ctrl K
+            </kbd>
+          </button>
+        </Tooltip>
 
         <Tooltip label="اعضا">
           <button

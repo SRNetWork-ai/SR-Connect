@@ -159,7 +159,7 @@ export function UpdateCenter() {
           </Button>
         </header>
 
-        <section className="rounded-lg bg-card p-5">
+        <section className="card-3d rounded-lg p-5">
           <div className="flex items-start gap-3">
             {upToDate ? (
               <CheckCircle2 className="mt-0.5 size-5 text-success" />
@@ -264,7 +264,7 @@ export function UpdateCenter() {
         </section>
 
         {isAdmin && (
-          <section className="rounded-lg bg-card p-5">
+          <section className="card-3d rounded-lg p-5">
             <h2 className="text-base font-bold text-t1">مدیریت انتشار</h2>
             {signingConfigured === false && (
               <p className="mt-2 rounded-md bg-warning-soft px-3 py-2 text-sm text-warning">

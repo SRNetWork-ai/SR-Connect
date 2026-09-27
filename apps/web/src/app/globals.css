@@ -662,3 +662,206 @@ textarea:focus-visible {
   height: 1px;
   background: linear-gradient(90deg, transparent, var(--color-divider), transparent);
 }
+
+/* ───────────────────────────────────────────────────────────────
+   لایه‌ی سه‌بعدی — v1.3
+   قبلاً هر سطح یک مستطیل تخت بود. اینجا سه چیز اضافه می‌شود:
+   لبه‌ی روشن بالا (نور)، لبه‌ی تیره‌ی پایین (سایه‌ی خودش) و سایه‌ی
+   بیرونی چندلایه. نتیجه: چشم ارتفاع می‌بیند، بدون افت خوانایی.
+   ─────────────────────────────────────────────────────────────── */
+
+@theme {
+  --shadow-e1: 0 1px 2px rgb(0 0 0 / 0.3);
+  --shadow-e2: 0 2px 4px rgb(0 0 0 / 0.26), 0 6px 12px -6px rgb(0 0 0 / 0.4);
+  --shadow-e3: 0 4px 8px rgb(0 0 0 / 0.28), 0 14px 28px -12px rgb(0 0 0 / 0.5);
+  --shadow-e4: 0 8px 16px rgb(0 0 0 / 0.3), 0 28px 56px -20px rgb(0 0 0 / 0.6);
+}
+
+/* کارت برجسته: نور از بالا، سایه‌ی خودش از پایین */
+@utility card-3d {
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--color-card) 86%, #fff 7%),
+    var(--color-card) 55%,
+    color-mix(in oklab, var(--color-card) 94%, #000 8%)
+  );
+  border: 1px solid rgb(255 255 255 / 0.07);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.1),
+    inset 0 -1px 0 rgb(0 0 0 / 0.35),
+    var(--shadow-e2);
+}
+
+/* سطح فرورفته: برای ورودی‌ها و جاهایی که باید «تو رفته» حس شوند */
+@utility well-3d {
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--color-deep) 96%, #000 8%),
+    var(--color-deep)
+  );
+  box-shadow:
+    inset 0 2px 4px rgb(0 0 0 / 0.45),
+    inset 0 -1px 0 rgb(255 255 255 / 0.05);
+}
+
+/* پنل شناور با ارتفاع زیاد: منو، دیالوگ، پاپ‌آور */
+@utility float-3d {
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--color-floating) 82%, #fff 6%),
+    var(--color-floating)
+  );
+  border: 1px solid rgb(255 255 255 / 0.08);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.08),
+    var(--shadow-e4);
+}
+
+/* دکمه‌ی سه‌بعدی: تیغه‌ی پایین با فشار جمع می‌شود، مثل کلید فیزیکی */
+.btn-3d {
+  position: relative;
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--color-card) 84%, #fff 9%),
+    var(--color-card)
+  );
+  border: 1px solid rgb(255 255 255 / 0.08);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.12),
+    0 2px 0 0 rgb(0 0 0 / 0.45),
+    var(--shadow-e1);
+  transition:
+    transform 0.11s var(--ease-out-soft),
+    box-shadow 0.11s var(--ease-out-soft),
+    background 0.14s ease,
+    color 0.14s ease;
+}
+.btn-3d:hover:not(:disabled) {
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--color-hover) 80%, #fff 12%),
+    var(--color-hover)
+  );
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.14),
+    0 3px 0 0 rgb(0 0 0 / 0.45),
+    var(--shadow-e2);
+}
+.btn-3d:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow:
+    inset 0 2px 5px rgb(0 0 0 / 0.4),
+    0 0 0 0 rgb(0 0 0 / 0.45);
+}
+.btn-3d:disabled {
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.05);
+  transform: none;
+}
+
+/* حالت‌های رنگی دکمه‌ی سه‌بعدی */
+.btn-3d[data-tone="brand"] {
+  background: linear-gradient(180deg, #6b77f7, var(--color-brand));
+  border-color: rgb(255 255 255 / 0.16);
+  color: #fff;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.28),
+    0 2px 0 0 #303b9c,
+    0 6px 14px -8px var(--color-brand);
+}
+.btn-3d[data-tone="brand"]:hover:not(:disabled) {
+  background: linear-gradient(180deg, #7e89f9, #5a67e8);
+}
+.btn-3d[data-tone="danger"] {
+  background: linear-gradient(180deg, #f9585c, var(--color-danger));
+  border-color: rgb(255 255 255 / 0.14);
+  color: #fff;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.26),
+    0 2px 0 0 #97181c,
+    0 6px 14px -8px var(--color-danger);
+}
+.btn-3d[data-tone="success"] {
+  background: linear-gradient(180deg, #2fbe6c, var(--color-success));
+  border-color: rgb(255 255 255 / 0.14);
+  color: #fff;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.24),
+    0 2px 0 0 #146334,
+    0 6px 14px -8px var(--color-success);
+}
+
+/* آیکون‌های ریل سرور: قرص براق با پرسپکتیو ملایم */
+.rail-3d {
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--color-card) 82%, #fff 10%),
+    color-mix(in oklab, var(--color-card) 96%, #000 6%)
+  );
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.13),
+    inset 0 -2px 4px rgb(0 0 0 / 0.3),
+    var(--shadow-e2);
+  transition:
+    transform 0.16s var(--ease-spring),
+    border-radius 0.16s ease,
+    background 0.16s ease,
+    box-shadow 0.16s ease;
+}
+.rail-3d:hover {
+  transform: translateY(-2px) scale(1.04);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.18),
+    var(--shadow-e3);
+}
+.rail-3d[data-active="true"] {
+  background: linear-gradient(180deg, #737ef8, var(--color-brand));
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.3),
+    inset 0 -2px 6px rgb(0 0 0 / 0.28),
+    0 6px 18px -8px var(--color-brand);
+}
+
+/* براقی نازک روی لبه‌ی بالای یک سطح */
+.sheen-top::before {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: 40%;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.07), transparent);
+  pointer-events: none;
+}
+
+/* گوشه‌های صفحه کمی تاریک‌تر — عمق کل قاب را بیشتر می‌کند */
+.vignette::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(120% 90% at 50% 0%, transparent 40%, rgb(0 0 0 / 0.22) 100%);
+}
+
+/* کنسول صوتی: مثل یک قطعه سخت‌افزار روی نوار کناری */
+.console-3d {
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--color-deep) 82%, #fff 8%),
+    var(--color-deep) 60%,
+    color-mix(in oklab, var(--color-deep) 92%, #000 10%)
+  );
+  border: 1px solid rgb(255 255 255 / 0.07);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.09),
+    inset 0 -1px 0 rgb(0 0 0 / 0.4),
+    var(--shadow-e2);
+}
+.console-3d[data-live="true"] {
+  border-color: color-mix(in oklab, var(--color-success) 40%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.1),
+    0 0 0 1px color-mix(in oklab, var(--color-success) 24%, transparent),
+    0 10px 26px -16px var(--color-success),
+    var(--shadow-e2);
+}
