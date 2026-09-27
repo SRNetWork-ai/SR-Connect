@@ -2,6 +2,8 @@
 
 import { useEffect } from "react";
 import { X } from "lucide-react";
+import { HotkeyLayer } from "@/components/shell/HotkeyLayer";
+import { QuickSwitcher } from "@/components/shell/QuickSwitcher";
 import { ServerRail } from "@/components/shell/ServerRail";
 import { ChannelSidebar } from "@/components/shell/ChannelSidebar";
 import { ScreenShareView } from "@/components/shell/ScreenShareView";
@@ -38,12 +40,14 @@ export function AppChrome({ children }: { children: React.ReactNode }) {
 
   if (fullscreen) {
     return (
-      <div className="relative flex h-dvh flex-col overflow-hidden bg-chat-deep">
+      <div className="bg-chat-deep vignette relative flex h-dvh flex-col overflow-hidden">
+        <HotkeyLayer />
+        <QuickSwitcher />
         <Tooltip label="بستن (Esc)">
           <button
             onClick={() => setView("chat")}
             aria-label="بستن"
-            className="absolute end-5 top-5 z-20 grid size-9 place-items-center rounded-full border border-stroke text-t3 transition-colors hover:bg-hover hover:text-t1"
+            className="btn-3d absolute end-5 top-5 z-20 grid size-9 place-items-center rounded-full text-t3 hover:text-t1"
           >
             <X className="size-4" />
           </button>
@@ -55,9 +59,11 @@ export function AppChrome({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-dvh overflow-hidden">
+      <HotkeyLayer />
+      <QuickSwitcher />
       <ServerRail />
       {view === "chat" && <ChannelSidebar />}
-      <main className="bg-chat-deep flex min-w-0 flex-1 flex-col">
+      <main className="bg-chat-deep vignette relative flex min-w-0 flex-1 flex-col">
         <UpdateBanner />
         <ScreenShareView />
         {children}

@@ -51,7 +51,7 @@ export function Dialog({
             initial="hidden"
             animate="show"
             exit="exit"
-            className="surface-raised relative w-full max-w-[420px] rounded-xl p-5"
+            className="float-3d sheen-top relative w-full max-w-[420px] rounded-2xl p-5"
           >
             <button
               onClick={onClose}

@@ -2,11 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  Headphones,
-  HeadphoneOff,
   Loader2,
-  Mic,
-  MicOff,
   MonitorOff,
   MonitorUp,
   PhoneOff,
@@ -30,16 +26,12 @@ export function VoiceStatus() {
   const status = useVoice((s) => s.status);
   const channelName = useVoice((s) => s.channelName);
   const channelId = useVoice((s) => s.channelId);
-  const muted = useVoice((s) => s.muted);
-  const deafened = useVoice((s) => s.deafened);
   const streaming = useVoice((s) => s.streaming);
   const canShare = useVoice((s) => s.canShare);
   const ping = useVoice((s) => s.ping);
   const error = useVoice((s) => s.error);
   const phase = useVoice((s) => s.phase);
   const noiseFilterActive = useVoice((s) => s.noiseFilterActive);
-  const toggleMute = useVoice((s) => s.toggleMute);
-  const toggleDeafen = useVoice((s) => s.toggleDeafen);
   const toggleScreenShare = useVoice((s) => s.toggleScreenShare);
   const leave = useVoice((s) => s.leave);
   const cancel = useVoice((s) => s.cancel);
@@ -62,10 +54,10 @@ export function VoiceStatus() {
     <motion.div
       layout
       transition={springSnappy}
+      data-live={connected ? "true" : "false"}
       className={cn(
-        "relative mx-2 mb-1.5 overflow-hidden rounded-lg bg-deep p-2.5",
-        connected && "ring-1 ring-success/25",
-        status === "error" && "ring-1 ring-danger/30",
+        "console-3d sheen-top relative mx-2 mb-2 overflow-hidden rounded-xl p-2.5",
+        status === "error" && "border-danger/40",
       )}
     >
       {/* نوار گرادیانی وقتی در حال اتصال است — نشان می‌دهد کار در جریان است */}
@@ -132,7 +124,7 @@ export function VoiceStatus() {
             /* تنها عددی که واقعاً به کار کاربر می‌آید: تأخیر. رنگش کیفیت را می‌گوید. */
             <span
               className={cn(
-                "tnum text-2xs whitespace-nowrap font-bold",
+                "tnum well-3d rounded-pill px-2 py-0.5 text-2xs whitespace-nowrap font-bold",
                 quality === 3 ? "text-success" : quality === 2 ? "text-warning" : "text-danger",
               )}
             >
@@ -164,26 +156,10 @@ export function VoiceStatus() {
         )}
       </AnimatePresence>
 
-      <div className="mt-2 grid grid-cols-4 gap-1.5">
-        <VoiceButton
-          label={muted ? "روشن کردن میکروفون" : "بی‌صدا کردن"}
-          active={muted}
-          danger={muted}
-          disabled={!connected}
-          onClick={() => void toggleMute()}
-        >
-          {muted ? <MicOff className="size-4" /> : <Mic className="size-4" />}
-        </VoiceButton>
-
-        <VoiceButton
-          label={deafened ? "روشن کردن صدا" : "قطع صدا"}
-          active={deafened}
-          danger={deafened}
-          onClick={() => void toggleDeafen()}
-        >
-          {deafened ? <HeadphoneOff className="size-4" /> : <Headphones className="size-4" />}
-        </VoiceButton>
-
+      {/* میکروفون و هدفون عمداً اینجا نیستند: همین پایین در پنل کاربر همیشه
+          در دسترس‌اند و داشتنشان در دو جا، هم تکراری بود و هم مستطیل را
+          پرِ دکمه‌های ریز می‌کرد. اینجا فقط کارهای مخصوص همین تماس می‌ماند. */}
+      <div className="mt-2.5 grid grid-cols-2 gap-2">
         <VoiceButton
           label={
             !connected
@@ -199,6 +175,7 @@ export function VoiceStatus() {
           onClick={() => void toggleScreenShare()}
         >
           {streaming ? <MonitorOff className="size-4" /> : <MonitorUp className="size-4" />}
+          <span className="text-2xs font-bold">{streaming ? "پایان پخش" : "پخش صفحه"}</span>
         </VoiceButton>
 
         <VoiceButton
@@ -208,6 +185,7 @@ export function VoiceStatus() {
           onClick={() => (connecting ? cancel() : void leave())}
         >
           <PhoneOff className="size-4" />
+          <span className="text-2xs font-bold">{connecting ? "لغو" : "قطع تماس"}</span>
         </VoiceButton>
       </div>
     </motion.div>
@@ -232,30 +210,36 @@ function VoiceButton({
   /** حالت پخش زنده: هاله‌ی نفس‌کش می‌گیرد تا از دور هم دیده شود. */
   live?: boolean;
 }) {
+  // رنگ فقط وقتی معنی دارد که دکمه قابل زدن باشد؛ دکمه‌ی قرمزِ خاموش گیج‌کننده است.
+  const tone = disabled
+    ? undefined
+    : active && danger
+      ? "danger"
+      : active
+        ? "success"
+        : danger
+          ? "danger"
+          : undefined;
+
   return (
     <Tooltip label={label}>
-      <motion.button
-        whileTap={disabled ? undefined : tap}
-        whileHover={disabled ? undefined : { y: -1 }}
-        transition={springSnappy}
+      {/* transform را به CSS می‌سپاریم تا با فشردگی سه‌بعدی دکمه تداخل نکند */}
+      <button
+        type="button"
         disabled={disabled}
         onClick={onClick}
         aria-label={label}
         aria-pressed={active}
+        data-tone={tone}
+        data-no-press
         className={cn(
-          "grid h-8 w-full place-items-center rounded-[6px] transition-colors disabled:opacity-40",
+          "btn-3d flex h-9 w-full items-center justify-center gap-1.5 rounded-[8px] disabled:opacity-40",
           live && "glow-active",
-          active && danger
-            ? "bg-danger-soft text-danger"
-            : active
-              ? "bg-success-soft text-success"
-              : danger
-                ? "bg-card text-[#ff8a8d] hover:bg-danger hover:text-white"
-                : "bg-card text-t2 hover:bg-hover",
+          !tone && "text-t2",
         )}
       >
         {children}
-      </motion.button>
+      </button>
     </Tooltip>
   );
 }

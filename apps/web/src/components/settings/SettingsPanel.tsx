@@ -213,7 +213,7 @@ function ServerProfileTab({ onError }: { onError: (error: string | null) => void
     }
   }
   return (
-    <section className="space-y-4 rounded-lg bg-card p-5">
+    <section className="space-y-4 card-3d rounded-lg p-5">
       <Field
         label="نام سرور"
         value={profile.name}
@@ -294,7 +294,7 @@ function MembersTab({ onError }: { onError: (error: string | null) => void }) {
     }
   }
   return (
-    <section className="rounded-lg bg-card p-5">
+    <section className="card-3d rounded-lg p-5">
       <Field
         label="جست‌وجوی ممبر"
         value={query}
@@ -360,7 +360,7 @@ function BansTab({ onError }: { onError: (error: string | null) => void }) {
     await load();
   }
   return (
-    <section className="rounded-lg bg-card p-5">
+    <section className="card-3d rounded-lg p-5">
       <ul className="space-y-2">
         {bans.map((ban) => (
           <li key={ban.userId} className="flex items-center gap-3 rounded-md bg-deep p-3">
@@ -413,7 +413,7 @@ function ChannelsTab({
   }
 
   return (
-    <section className="rounded-lg bg-card p-5">
+    <section className="card-3d rounded-lg p-5">
       {canManage && (
         <form
           onSubmit={create}
@@ -508,7 +508,7 @@ function RolesTab({
   }, [canManage, onError]);
 
   if (!canManage) {
-    return <p className="rounded-lg bg-card p-5 text-sm text-t4">دسترسی مدیریت نقش‌ها را نداری.</p>;
+    return <p className="card-3d rounded-lg p-5 text-sm text-t4">دسترسی مدیریت نقش‌ها را نداری.</p>;
   }
 
   const role = roles.find((r) => r.id === selected);
@@ -537,7 +537,7 @@ function RolesTab({
   }
 
   return (
-    <section className="flex gap-5 rounded-lg bg-card p-5">
+    <section className="flex gap-5 card-3d rounded-lg p-5">
       <aside className="w-[200px] shrink-0">
         <ul className="space-y-1">
           {roles.map((r) => (
@@ -627,7 +627,7 @@ function InvitesTab({
 
   if (!canManage) {
     return (
-      <p className="rounded-lg bg-card p-5 text-sm text-t4">اجازه‌ی ساخت دعوت‌نامه را نداری.</p>
+      <p className="card-3d rounded-lg p-5 text-sm text-t4">اجازه‌ی ساخت دعوت‌نامه را نداری.</p>
     );
   }
 
@@ -656,7 +656,7 @@ function InvitesTab({
   }
 
   return (
-    <section className="rounded-lg bg-card p-5">
+    <section className="card-3d rounded-lg p-5">
       <div className="flex items-center gap-3">
         <p className="text-sm text-t3">هر دعوت‌نامه تا ۱۰ عضو و ۷ روز اعتبار دارد.</p>
         <Button size="sm" className="ms-auto" loading={busy} onClick={() => void create()}>
@@ -745,7 +745,7 @@ function ProfileTab() {
   }
 
   return (
-    <section className="rounded-lg bg-card p-5">
+    <section className="card-3d rounded-lg p-5">
       <div className="flex flex-wrap items-start gap-6">
         <div className="text-center">
           <button
@@ -870,11 +870,11 @@ function AuditTab({
   }, [canManage, onError]);
 
   if (!canManage) {
-    return <p className="rounded-lg bg-card p-5 text-sm text-t4">دسترسی دیدن گزارش را نداری.</p>;
+    return <p className="card-3d rounded-lg p-5 text-sm text-t4">دسترسی دیدن گزارش را نداری.</p>;
   }
 
   return (
-    <section className="rounded-lg bg-card p-5">
+    <section className="card-3d rounded-lg p-5">
       <p className="text-sm text-t3">آخرین کارهای مدیریتی روی سرور.</p>
       <ul className="mt-4 space-y-1">
         {loading && <li className="py-3 text-center text-sm text-t4">در حال بارگذاری…</li>}

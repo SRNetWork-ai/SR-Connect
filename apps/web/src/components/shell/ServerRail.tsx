@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { Download, MessageSquare, Shield } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { fa } from "@/lib/fmt";
-import { springSnappy, tap } from "@/lib/motion";
+import { springSnappy } from "@/lib/motion";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { useApp } from "@/store/use-app";
 import { useShell, type ShellView } from "@/store/use-shell";
@@ -33,23 +33,24 @@ export function ServerRail() {
   return (
     <nav
       aria-label="بخش‌ها"
-      className="bg-rail-deep flex w-[72px] shrink-0 flex-col items-center gap-2 py-3"
+      className="bg-rail-deep vignette relative flex w-[72px] shrink-0 flex-col items-center gap-2 py-3"
     >
       <Tooltip label="دوستان و پیام‌های خصوصی" side="end">
         <motion.button
           type="button"
-          whileTap={tap}
           onClick={() => setView("friends")}
           aria-label="دوستان و پیام‌های خصوصی"
+          data-active={view === "friends" ? "true" : "false"}
           className={cn(
-            "grid size-12 place-items-center rounded-[16px] text-base font-black transition-colors",
-            view === "friends" ? "bg-brand text-white" : "bg-card text-t2 hover:bg-brand",
+            "rail-3d grid size-12 place-items-center rounded-[16px] text-base font-black",
+            view === "friends" ? "text-white" : "text-t2",
           )}
         >
           SR
         </motion.button>
       </Tooltip>
-      <span className="my-1 h-0.5 w-8 rounded-full bg-[#35363c]" />
+      {/* جداکننده‌ی حجم‌دار: یک خط تیره و یک خط روشن، مثل شیار حقیقی */}
+      <span className="my-1 h-px w-8 rounded-full bg-black/45 shadow-[0_1px_0_0_rgb(255_255_255_/_0.07)]" />
 
       {NAV.map((item) => {
         const active = view === item.view;
@@ -63,15 +64,15 @@ export function ServerRail() {
           <Tooltip key={item.view} label={item.label} side="end">
             <motion.button
               type="button"
-              whileTap={tap}
               onClick={() => setView(item.view)}
               aria-current={active ? "page" : undefined}
               aria-label={item.label}
+              data-active={active ? "true" : "false"}
               className={cn(
-                "relative grid size-12 place-items-center transition-[background-color,color,border-radius] duration-150",
+                "rail-3d relative grid size-12 place-items-center",
                 active
-                  ? "rounded-[14px] bg-brand text-white"
-                  : "rounded-[16px] bg-card text-t2 hover:rounded-[14px] hover:bg-brand hover:text-white",
+                  ? "rounded-[14px] text-white"
+                  : "rounded-[16px] text-t2 hover:rounded-[14px]",
               )}
             >
               <item.icon className="size-5" />

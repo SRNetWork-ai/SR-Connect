@@ -119,7 +119,7 @@ export function EmojiPicker({
           exit={{ opacity: 0, y: 6, scale: 0.97 }}
           transition={{ type: "spring", stiffness: 380, damping: 28 }}
           className={cn(
-            "surface absolute bottom-full z-50 mb-2 w-[296px] rounded-xl p-2",
+            "float-3d absolute bottom-full z-50 mb-2 w-[296px] rounded-xl p-2",
             align === "end" ? "end-0" : "start-0",
           )}
         >

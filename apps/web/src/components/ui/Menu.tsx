@@ -66,7 +66,7 @@ export function Menu({
             exit="exit"
             style={{ transformOrigin: "top" }}
             className={cn(
-              "surface absolute top-full z-50 mt-1 min-w-[208px] rounded-lg p-1.5",
+              "float-3d absolute top-full z-50 mt-1 min-w-[208px] rounded-lg p-1.5",
               align === "start" ? "start-0" : "end-0",
             )}
           >

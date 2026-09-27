@@ -38,6 +38,8 @@ interface VoiceState {
   /** حذف نویز هوشمند Krisp روی صدای میکروفون پیش از ارسال. */
   noiseCancellation: boolean;
   noiseFilterActive: boolean;
+  /** null یعنی هنوز سنجیده نشده؛ یک‌بار سنجیده می‌شود و کش می‌ماند. */
+  noiseFilterSupported: boolean | null;
 
   join(channelId: string): Promise<void>;
   leave(): Promise<void>;
@@ -47,6 +49,8 @@ interface VoiceState {
   toggleDeafen(): Promise<void>;
   toggleScreenShare(): Promise<void>;
   toggleNoiseCancellation(): Promise<void>;
+  /** سنجش پشتیبانی نویزگیر بدون ورود به تماس — برای صفحه‌ی تنظیمات. */
+  probeNoiseFilter(): Promise<void>;
 }
 
 // اتاق LiveKit بیرون از state نگه داشته می‌شود؛ یک نمونه در کل اپ.
@@ -97,6 +101,27 @@ function savedNoisePreference(): boolean {
   return window.localStorage.getItem("sr:noise-cancellation") !== "off";
 }
 
+/**
+ * پشتیبانی نویزگیر فقط یک‌بار سنجیده می‌شود.
+ *
+ * قبلاً هر بار ورود به کانال دوباره تلاش می‌کرد و روی مرورگرهایی که
+ * پشتیبانی ندارند، هر تماس یک هشدار تکراری می‌داد. حالا نتیجه کش می‌شود،
+ * هشدار حذف شده و وضعیت واقعی در صفحه‌ی تنظیمات توضیح داده می‌شود.
+ */
+let noiseSupport: boolean | null = null;
+
+export async function detectNoiseFilterSupport(): Promise<boolean> {
+  if (noiseSupport !== null) return noiseSupport;
+  try {
+    const { isKrispNoiseFilterSupported } = await import("@livekit/krisp-noise-filter");
+    noiseSupport = isKrispNoiseFilterSupported();
+  } catch {
+    // بسته‌ی نویزگیر بار نشد (شبکه، CSP، یا محیط بدون WASM) — فیلتر پایه‌ی مرورگر می‌ماند.
+    noiseSupport = false;
+  }
+  return noiseSupport;
+}
+
 async function applyNoiseFilter(enabled: boolean): Promise<boolean> {
   if (!room) return false;
   const { Track } = await import("livekit-client");
@@ -108,9 +133,9 @@ async function applyNoiseFilter(enabled: boolean): Promise<boolean> {
     return false;
   }
 
-  const { KrispNoiseFilter, isKrispNoiseFilterSupported } =
-    await import("@livekit/krisp-noise-filter");
-  if (!isKrispNoiseFilterSupported()) return false;
+  if (!(await detectNoiseFilterSupport())) return false;
+
+  const { KrispNoiseFilter } = await import("@livekit/krisp-noise-filter");
   if (!noiseProcessor) {
     noiseProcessor = KrispNoiseFilter({ quality: "medium", useBVC: true });
     await microphone.setProcessor(noiseProcessor);
@@ -136,11 +161,12 @@ export const useVoice = create<VoiceState>()((set, get) => ({
   phase: null,
   noiseCancellation: savedNoisePreference(),
   noiseFilterActive: false,
+  noiseFilterSupported: noiseSupport,
 
   async join(channelId) {
     if (get().channelId === channelId && get().status === "connected") return;
     if (get().status === "connecting") return;
-    get().leave();
+    await get().leave();
     const attempt = ++joinAttempt;
     const alive = () => attempt === joinAttempt;
     set({ status: "connecting", channelId, error: null, phase: "گرفتن مجوز از سرور" });
@@ -170,10 +196,22 @@ export const useVoice = create<VoiceState>()((set, get) => ({
       });
       room = r;
 
-      r.on(RoomEvent.ActiveSpeakersChanged, (speakers) =>
-        set({ speaking: speakers.map((s) => s.identity) }),
-      );
+      /**
+       * باگی که کاربر می‌دید: «یک‌بار جوین بدی و بزنی بره، دیگر وصل نمی‌شود.»
+       *
+       * ریشه‌اش این بود که رویدادهای اتاق قبلی با تأخیر می‌رسیدند. هندلر
+       * Disconnected اتاق قدیمی، تایمر و پردازشگر صدای اتصال **تازه** را
+       * پاک می‌کرد و status را به idle برمی‌گرداند؛ پنل صوتی قفل می‌شد.
+       * حالا هر هندلر اول مطمئن می‌شود اتاق جاری همین اتاق است.
+       */
+      const current = () => room === r;
+
+      r.on(RoomEvent.ActiveSpeakersChanged, (speakers) => {
+        if (!current()) return;
+        set({ speaking: speakers.map((s) => s.identity) });
+      });
       r.on(RoomEvent.TrackSubscribed, (track, _pub, participant) => {
+        if (!current()) return;
         if (track.kind === Track.Kind.Audio) {
           const el = track.attach();
           el.autoplay = true;
@@ -198,11 +236,15 @@ export const useVoice = create<VoiceState>()((set, get) => ({
       });
       r.on(RoomEvent.TrackUnsubscribed, (track, _pub, participant) => {
         track.detach().forEach((el) => el.remove());
+        if (!current()) return;
         if (track.source === Track.Source.ScreenShare) {
           set((st) => ({ screens: st.screens.filter((s2) => s2.userId !== participant.identity) }));
         }
       });
       r.on(RoomEvent.Disconnected, () => {
+        // اتاق قدیمی حق ندارد اتصال تازه را خاموش کند.
+        if (!current()) return;
+        room = null;
         if (statsTimer) {
           clearInterval(statsTimer);
           statsTimer = null;
@@ -250,13 +292,12 @@ export const useVoice = create<VoiceState>()((set, get) => ({
           useApp.getState().pushToast("میکروفون باز نشد؛ شنونده وارد شدی", "warning");
         });
         if (get().noiseCancellation) {
-          const active = await applyNoiseFilter(true).catch(() => false);
-          set({ noiseFilterActive: active });
-          if (!active) {
-            useApp
-              .getState()
-              .pushToast("نویزگیر هوشمند روی این مرورگر پشتیبانی نمی‌شود", "warning");
-          }
+          // بی‌صدا و بی‌هشدار: اگر نشد، فیلتر پایه‌ی مرورگر کار خودش را می‌کند
+          // و دلیلش در «ویس و ویدیو» نوشته می‌شود. هشدار هر تماس آزاردهنده بود.
+          const supported = await detectNoiseFilterSupport();
+          const active = supported ? await applyNoiseFilter(true).catch(() => false) : false;
+          if (supported && !active) noiseSupport = false;
+          set({ noiseFilterActive: active, noiseFilterSupported: supported && active });
         }
       }
       if (!alive()) {
@@ -433,26 +474,36 @@ export const useVoice = create<VoiceState>()((set, get) => ({
       window.localStorage.setItem("sr:noise-cancellation", enabled ? "on" : "off");
     }
     if (!room || get().status !== "connected") {
-      set({ noiseFilterActive: false });
+      const supported = enabled ? await detectNoiseFilterSupport() : get().noiseFilterSupported;
+      set({ noiseFilterActive: false, noiseFilterSupported: supported });
       useApp
         .getState()
         .pushToast(
-          enabled ? "نویزگیر هوشمند برای تماس بعدی روشن شد" : "نویزگیر هوشمند خاموش شد",
-          "success",
+          !enabled
+            ? "نویزگیر هوشمند خاموش شد"
+            : supported
+              ? "نویزگیر هوشمند برای تماس بعدی روشن شد"
+              : "این مرورگر نویزگیر هوشمند ندارد؛ فیلتر پایه‌ی مرورگر فعال می‌ماند",
+          enabled && !supported ? "info" : "success",
         );
       return;
     }
     const active = await applyNoiseFilter(enabled).catch(() => false);
-    set({ noiseFilterActive: active });
+    set({ noiseFilterActive: active, noiseFilterSupported: enabled ? active : noiseSupport });
     useApp
       .getState()
       .pushToast(
         enabled && active
           ? "نویزگیر هوشمند فعال شد"
           : enabled
-            ? "این مرورگر از نویزگیر هوشمند پشتیبانی نمی‌کند"
+            ? "این مرورگر نویزگیر هوشمند ندارد؛ فیلتر پایه‌ی مرورگر فعال می‌ماند"
             : "نویزگیر هوشمند خاموش شد",
-        enabled && !active ? "warning" : "success",
+        enabled && !active ? "info" : "success",
       );
+  },
+
+  async probeNoiseFilter() {
+    if (get().noiseFilterSupported !== null) return;
+    set({ noiseFilterSupported: await detectNoiseFilterSupport() });
   },
 }));

@@ -86,7 +86,7 @@ export function EmojiTab({ onError }: { onError: OnError }) {
   const shown = items.filter((item) => item.kind === kind);
 
   return (
-    <section className="space-y-4 rounded-lg bg-card p-5">
+    <section className="space-y-4 card-3d rounded-lg p-5">
       <div className="grid grid-cols-2 gap-1 rounded-md bg-deep p-1">
         {(
           [
@@ -100,7 +100,7 @@ export function EmojiTab({ onError }: { onError: OnError }) {
             onClick={() => setKind(id)}
             className={cn(
               "flex items-center justify-center gap-1.5 rounded-[5px] px-3 py-2 text-sm font-bold",
-              kind === id ? "bg-card text-t1" : "text-t4 hover:text-t2",
+              kind === id ? "card-3d text-t1" : "text-t4 hover:text-t2",
             )}
           >
             <Icon className="size-4" />
@@ -218,7 +218,7 @@ export function WelcomeTab({ onError }: { onError: OnError }) {
   }
 
   return (
-    <section className="space-y-4 rounded-lg bg-card p-5">
+    <section className="space-y-4 card-3d rounded-lg p-5">
       <label className="flex items-center gap-2 text-sm text-t2">
         <input
           type="checkbox"
@@ -278,7 +278,7 @@ export function WelcomeTab({ onError }: { onError: OnError }) {
                   next[index] = { ...item, description: event.target.value };
                   set({ channels: next });
                 }}
-                className="h-10 min-w-0 flex-1 rounded-[4px] bg-deep px-3 text-sm text-t2 outline-none focus:ring-1 focus:ring-brand"
+                className="well-3d h-10 min-w-0 flex-1 rounded-[7px] px-3 text-sm text-t2 outline-none focus:ring-1 focus:ring-brand"
               />
               <button
                 type="button"
@@ -317,7 +317,7 @@ export function WelcomeTab({ onError }: { onError: OnError }) {
                   next[index] = event.target.value;
                   set({ rules: next });
                 }}
-                className="h-10 min-w-0 flex-1 rounded-[4px] bg-deep px-3 text-sm text-t2 outline-none focus:ring-1 focus:ring-brand"
+                className="well-3d h-10 min-w-0 flex-1 rounded-[7px] px-3 text-sm text-t2 outline-none focus:ring-1 focus:ring-brand"
               />
               <button
                 type="button"
@@ -426,7 +426,7 @@ export function BackupTab({ onError }: { onError: OnError }) {
   }
 
   return (
-    <section className="space-y-4 rounded-lg bg-card p-5">
+    <section className="space-y-4 card-3d rounded-lg p-5">
       <p className="text-sm text-t4">
         بکاپ شامل پروفایل سرور، دسته‌ها، کانال‌ها، نقش‌ها و فهرست ایموجی‌هاست. پیام‌ها ذخیره
         نمی‌شوند تا بازیابی، گفت‌وگوی حذف‌شده را برنگرداند.
@@ -608,7 +608,7 @@ export function ReportsTab({ onError }: { onError: OnError }) {
   const shown = reports.filter((report) => filter === "all" || report.status === "open");
 
   return (
-    <section className="space-y-3 rounded-lg bg-card p-5">
+    <section className="space-y-3 card-3d rounded-lg p-5">
       <div className="grid grid-cols-2 gap-1 rounded-md bg-deep p-1">
         {(
           [

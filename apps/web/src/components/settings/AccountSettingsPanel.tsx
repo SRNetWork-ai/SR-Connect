@@ -4,6 +4,7 @@ import {
   Bell,
   Brush,
   Headphones,
+  Keyboard,
   LogOut,
   MessageSquareLock,
   RefreshCw,
@@ -32,6 +33,15 @@ import {
   type SoundName,
 } from "@/lib/sounds";
 import { autoUpdateEnabled, setAutoUpdateEnabled } from "@/lib/updater/prefs";
+import { HOTKEYS } from "@/lib/hotkeys";
+import {
+  desktopNotificationsEnabled,
+  notifyPermission,
+  requestNotifyPermission,
+  setDesktopNotificationsEnabled,
+  showDesktopNotice,
+  type NotifyPermission,
+} from "@/lib/notify";
 
 type AccountTab =
   | "account"
@@ -41,6 +51,7 @@ type AccountTab =
   | "booster"
   | "wishes"
   | "voice"
+  | "shortcuts"
   | "theme"
   | "danger";
 
@@ -52,6 +63,7 @@ const ITEMS: { id: AccountTab; label: string; icon: typeof UserRound; soon?: boo
   { id: "booster", label: "بوستر", icon: Sparkles, soon: true },
   { id: "wishes", label: "ویش‌های سرور", icon: WandSparkles, soon: true },
   { id: "voice", label: "ویس و ویدیو", icon: Headphones },
+  { id: "shortcuts", label: "میان‌بُرها", icon: Keyboard },
   { id: "theme", label: "تم", icon: Brush },
   { id: "danger", label: "خروج و حذف حساب", icon: Trash2 },
 ];
@@ -94,6 +106,8 @@ export function AccountSettingsPanel() {
             <SecuritySettings />
           ) : tab === "voice" ? (
             <VoiceSettings />
+          ) : tab === "shortcuts" ? (
+            <ShortcutSettings />
           ) : tab === "danger" ? (
             <DangerSettings />
           ) : tab === "privacy" || tab === "notifications" || tab === "theme" ? (
@@ -303,6 +317,116 @@ function PreferenceSettings({ tab }: { tab: "privacy" | "notifications" | "theme
         checked={preferences.notifyCalls}
         onChange={(value) => void patch({ notifyCalls: value })}
       />
+      <DesktopNotifications />
+    </SettingsCard>
+  );
+}
+
+/**
+ * اعلان بیرون از اپ. اجازه‌ی مرورگر فقط با کلیک کاربر گرفته می‌شود،
+ * پس دکمه‌اش باید همین‌جا باشد و وضعیتش صادقانه نوشته شود.
+ */
+function DesktopNotifications() {
+  const pushToast = useApp((s) => s.pushToast);
+  const [permission, setPermission] = useState<NotifyPermission>("default");
+  const [enabled, setEnabled] = useState(true);
+
+  useEffect(() => {
+    setPermission(notifyPermission());
+    setEnabled(desktopNotificationsEnabled());
+  }, []);
+
+  async function ask() {
+    const next = await requestNotifyPermission();
+    setPermission(next);
+    if (next === "granted") {
+      showDesktopNotice({ title: "SR-Connect", body: "اعلان دسکتاپ فعال شد.", tag: "test" });
+    } else if (next === "denied") {
+      pushToast("مرورگر اجازه‌ی اعلان را رد کرد؛ از تنظیمات سایت فعالش کن", "warning");
+    }
+  }
+
+  return (
+    <div className="mt-3 rounded-md bg-deep px-4 py-3.5">
+      <div className="flex items-center justify-between gap-3">
+        <span className="min-w-0">
+          <strong className="block text-sm text-t2">اعلان دسکتاپ برای منشن و پیام خصوصی</strong>
+          <span className="mt-0.5 block text-2xs leading-5 text-t5">
+            {permission === "unsupported"
+              ? "این مرورگر اعلان دسکتاپ ندارد."
+              : permission === "denied"
+                ? "اجازه‌اش در مرورگر رد شده است."
+                : permission === "granted"
+                  ? "وقتی پنجره پشت بقیه باشد یا کانال دیگری باز باشد، اعلان می‌آید. در حالت «مزاحم نشوید» هیچ اعلانی نمی‌آید."
+                  : "برای فعال شدن، یک‌بار باید اجازه بدهی."}
+          </span>
+        </span>
+
+        {permission === "granted" ? (
+          <button
+            type="button"
+            role="switch"
+            aria-checked={enabled}
+            onClick={() => {
+              const next = !enabled;
+              setEnabled(next);
+              setDesktopNotificationsEnabled(next);
+            }}
+            className={cn(
+              "relative h-7 w-12 shrink-0 rounded-pill transition-colors",
+              enabled ? "bg-success" : "bg-card",
+            )}
+          >
+            <span
+              className={cn(
+                "absolute top-1 size-5 rounded-full bg-white shadow transition-[left,right]",
+                enabled ? "end-1" : "start-1",
+              )}
+            />
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => void ask()}
+            disabled={permission !== "default"}
+            className="btn-3d shrink-0 rounded-[8px] px-3 py-1.5 text-2xs font-bold text-t2 disabled:opacity-40"
+            data-tone={permission === "default" ? "brand" : undefined}
+          >
+            اجازه بده
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** راهنمای میان‌بُرها از همان فهرستی می‌آید که لایه‌ی شنونده استفاده می‌کند. */
+function ShortcutSettings() {
+  return (
+    <SettingsCard title="میان‌بُرها">
+      <p className="pb-1 text-xs leading-6 text-t5">
+        روی مک، Ctrl را با ⌘ عوض کن. میان‌بُرها وسط تایپ اجرا نمی‌شوند تا نوشتن پیام خراب نشود.
+      </p>
+      <ul>
+        {HOTKEYS.map((hotkey) => (
+          <li
+            key={hotkey.id}
+            className="flex items-center justify-between gap-3 border-t border-divider/60 py-2.5 first:border-t-0"
+          >
+            <span className="text-sm text-t2">{hotkey.label}</span>
+            <span className="flex shrink-0 items-center gap-1" dir="ltr">
+              {hotkey.keys.map((key) => (
+                <kbd
+                  key={key}
+                  className="well-3d rounded-[6px] px-2 py-1 font-sans text-2xs font-bold text-t3"
+                >
+                  {key}
+                </kbd>
+              ))}
+            </span>
+          </li>
+        ))}
+      </ul>
     </SettingsCard>
   );
 }
@@ -311,7 +435,7 @@ function SettingsCard({ title, children }: { title: string; children: React.Reac
   return (
     <section>
       <h2 className="text-xl font-black text-t1">{title}</h2>
-      <div className="mt-5 space-y-2 rounded-xl bg-card p-5">{children}</div>
+      <div className="mt-5 space-y-2 card-3d rounded-xl p-5">{children}</div>
     </section>
   );
 }
@@ -341,13 +465,33 @@ function ToggleRow({
 function VoiceSettings() {
   const enabled = useVoice((s) => s.noiseCancellation);
   const active = useVoice((s) => s.noiseFilterActive);
+  const supported = useVoice((s) => s.noiseFilterSupported);
   const connected = useVoice((s) => s.status === "connected");
   const toggle = useVoice((s) => s.toggleNoiseCancellation);
+  const probe = useVoice((s) => s.probeNoiseFilter);
+
+  // وضعیت واقعی را همین‌جا می‌سنجیم؛ کاربر لازم نباشد وارد تماس شود تا بفهمد.
+  useEffect(() => {
+    void probe();
+  }, [probe]);
+
+  const state: { text: string; tone: string } = active
+    ? { text: "فعال روی میکروفون فعلی", tone: "text-success" }
+    : connected && enabled
+      ? { text: "فیلتر پایه‌ی مرورگر فعال است", tone: "text-t4" }
+      : supported === false
+        ? {
+            text: "این مرورگر نویزگیر هوشمند ندارد — فیلتر پایه‌ی مرورگر جایش را می‌گیرد",
+            tone: "text-t4",
+          }
+        : supported === true
+          ? { text: "آماده؛ در تماس بعدی اعمال می‌شود", tone: "text-success" }
+          : { text: "", tone: "" };
 
   return (
     <section>
       <h2 className="text-xl font-black text-t1">ویس و ویدیو</h2>
-      <div className="mt-5 rounded-xl bg-card p-5">
+      <div className="card-3d mt-5 rounded-xl p-5">
         <div className="flex items-center gap-4">
           <span className="grid size-11 place-items-center rounded-lg bg-brand-soft text-brand">
             <WandSparkles className="size-5" />
@@ -357,10 +501,8 @@ function VoiceSettings() {
             <span className="mt-1 block text-xs leading-6 text-t4">
               صدای فن، کیبورد و نویز محیط قبل از ارسال میکروفون حذف می‌شود.
             </span>
-            {connected && enabled && (
-              <span className={cn("text-2xs font-bold", active ? "text-success" : "text-warning")}>
-                {active ? "فعال روی میکروفون فعلی" : "در حال آماده‌سازی یا پشتیبانی‌نشده"}
-              </span>
+            {state.text && (
+              <span className={cn("text-2xs font-bold", state.tone)}>{state.text}</span>
             )}
           </span>
           <button
@@ -413,7 +555,7 @@ function SoundSettings() {
   }, []);
 
   return (
-    <div className="mt-4 rounded-xl bg-card p-5">
+    <div className="mt-4 card-3d rounded-xl p-5">
       <div className="flex items-center gap-4">
         <span className="grid size-11 place-items-center rounded-lg bg-brand-soft text-brand">
           <Volume2 className="size-5" />
@@ -490,7 +632,7 @@ function AutoUpdateSetting() {
   useEffect(() => setOn(autoUpdateEnabled()), []);
 
   return (
-    <div className="mt-4 rounded-xl bg-card p-5">
+    <div className="mt-4 card-3d rounded-xl p-5">
       <div className="flex items-center gap-4">
         <span className="grid size-11 place-items-center rounded-lg bg-brand-soft text-brand">
           <RefreshCw className="size-5" />
@@ -543,7 +685,7 @@ function AccountInfo() {
   return (
     <section>
       <h2 className="text-xl font-black text-t1">اطلاعات حساب</h2>
-      <div className="mt-5 rounded-xl bg-card p-5">
+      <div className="mt-5 card-3d rounded-xl p-5">
         <div className="mb-5 flex items-center gap-3">
           <Avatar
             name={me?.displayName ?? "کاربر"}
@@ -620,7 +762,7 @@ function AccountSection({ tab }: { tab: Exclude<AccountTab, "account"> }) {
   return (
     <section>
       <h2 className="text-xl font-black text-t1">{item.label}</h2>
-      <div className="mt-5 rounded-xl bg-card p-8 text-center">
+      <div className="mt-5 card-3d rounded-xl p-8 text-center">
         <item.icon className="mx-auto size-10 text-brand" />
         <p className="mt-4 text-sm text-t3">
           {item.soon

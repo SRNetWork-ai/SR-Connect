@@ -51,7 +51,10 @@ export function UserPanel() {
   }
 
   return (
-    <div ref={ref} className="relative flex h-[52px] items-center gap-2 bg-deep px-2">
+    <div
+      ref={ref}
+      className="relative flex h-[54px] items-center gap-2 bg-deep px-2 shadow-[inset_0_1px_0_rgb(255_255_255_/_0.07),0_-6px_16px_-14px_#000]"
+    >
       <AnimatePresence>
         {menu && (
           <motion.div
@@ -59,7 +62,7 @@ export function UserPanel() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 6, scale: 0.97 }}
             transition={{ type: "spring", stiffness: 400, damping: 30 }}
-            className="surface absolute bottom-full inset-x-2 z-50 mb-2 rounded-lg p-1.5"
+            className="float-3d absolute bottom-full inset-x-2 z-50 mb-2 rounded-lg p-1.5"
           >
             <div className="flex items-center gap-2 rounded-[6px] px-2 py-2">
               <Avatar
@@ -99,7 +102,7 @@ export function UserPanel() {
 
       <button
         onClick={() => setMenu((v) => !v)}
-        className="flex min-w-0 flex-1 items-center gap-2 rounded-[5px] p-1 text-start transition-colors hover:bg-hover"
+        className="flex min-w-0 flex-1 items-center gap-2 rounded-[8px] p-1 text-start transition-colors hover:bg-hover"
       >
         <Avatar
           name={me?.displayName ?? "مهمان"}
@@ -136,7 +139,7 @@ export function UserPanel() {
           <motion.button
             type="button"
             onClick={() => setView("accountSettings")}
-            className="grid size-8 place-items-center rounded-[4px] text-t3 transition-colors hover:bg-hover hover:text-t1"
+            className="grid size-8 place-items-center rounded-[7px] text-t3 transition-colors hover:bg-hover hover:text-t1"
           >
             <motion.span
               whileHover={{ rotate: 45 }}
@@ -169,7 +172,7 @@ function IconButton({
         whileTap={{ scale: 0.9 }}
         aria-label={title}
         onClick={onClick}
-        className="grid size-8 place-items-center rounded-[4px] text-t3 transition-colors hover:bg-hover hover:text-t1"
+        className="grid size-8 place-items-center rounded-[7px] text-t3 transition-colors hover:bg-hover hover:text-t1"
       >
         {children}
       </motion.button>

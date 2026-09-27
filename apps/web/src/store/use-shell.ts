@@ -20,13 +20,20 @@ export const VIEW_TITLE: Record<ShellView, string> = {
   serverSettings: "تنظیمات سرور · SR-Connect",
 };
 
+/** پرش سریع دو حالت دارد: کانال‌ها و جست‌وجوی پیام. */
+export type SwitcherMode = "channels" | "messages";
+
 interface ShellState {
   view: ShellView;
   /** تبی که پس از باز شدن تنظیمات سرور باید انتخاب شود. */
   settingsTab: string | null;
+  /** null یعنی بسته است. */
+  switcher: SwitcherMode | null;
   /** جابه‌جایی بین نماها بدون رفت‌وبرگشت به سرور. */
   setView(view: ShellView, opts?: { replace?: boolean; tab?: string }): void;
   clearSettingsTab(): void;
+  openSwitcher(mode: SwitcherMode): void;
+  closeSwitcher(): void;
 }
 
 /**
@@ -40,9 +47,18 @@ interface ShellState {
 export const useShell = create<ShellState>()((set, get) => ({
   view: "chat",
   settingsTab: null,
+  switcher: null,
 
   clearSettingsTab() {
     set({ settingsTab: null });
+  },
+
+  openSwitcher(mode) {
+    set({ switcher: mode });
+  },
+
+  closeSwitcher() {
+    set({ switcher: null });
   },
 
   setView(view, opts) {
